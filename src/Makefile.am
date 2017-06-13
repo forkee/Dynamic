@@ -310,34 +310,37 @@ libdynamic_wallet_a_SOURCES = \
 crypto_libdynamic_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_CONFIG_INCLUDES) $(PIC_FLAGS)
 crypto_libdynamic_crypto_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS) $(PIC_FLAGS)
 crypto_libdynamic_crypto_a_SOURCES = \
-  crypto/common.h \
-  crypto/argon2d/argon2.h \
-  crypto/argon2d/core.h \
-  crypto/argon2d/encoding.h \
-  crypto/argon2d/thread.h \
-  crypto/argon2d/argon2.c \
-  crypto/argon2d/core.c \
-  crypto/argon2d/encoding.c \
-  crypto/argon2d/opt.c \
-  crypto/argon2d/thread.c \
-  crypto/blake2/blake2b.c \
-  crypto/blake2/blake2.h \
-  crypto/blake2/blake2-impl.h \
-  crypto/blake2/blamka-round-opt.h \
-  crypto/blake2/blamka-round-ref.h \
-  crypto/hmac_sha256.cpp \
-  crypto/hmac_sha256.h \
-  crypto/hmac_sha512.cpp \
-  crypto/hmac_sha512.h \
-  crypto/ripemd160.cpp \
-  crypto/ripemd160.h \
-  crypto/sha1.cpp \
-  crypto/sha1.h \
-  crypto/sha256.cpp \
-  crypto/sha256.h \
-  crypto/sha512.h \
-  crypto/sha512.cpp \
-  crypto/sha512.h
+	crypto/argon2d/argon2.c \
+	crypto/argon2d/argon2.h \
+	crypto/argon2d/core.c \
+	crypto/argon2d/core.h \
+	crypto/argon2d/encoding.c \
+	crypto/argon2d/encoding.h \
+	crypto/argon2d/opt.c \
+	crypto/argon2d/thread.c \
+	crypto/argon2d/thread.h \
+	crypto/blake2/blake2-impl.h \
+	crypto/blake2/blake2.h \
+	crypto/blake2/blake2b.c \
+	crypto/blake2/blamka-round-opt.h \
+	crypto/blake2/blamka-round-ref.h \
+	crypto/common.h \
+	crypto/chacha20.cpp \
+	crypto/chacha20.h \
+	crypto/hmac_sha256.cpp \
+	crypto/hmac_sha256.h \
+	crypto/hmac_sha512.cpp \
+	crypto/hmac_sha512.h \
+	crypto/muhash.cpp \
+	crypto/muhash.h \
+	crypto/ripemd160.cpp \
+	crypto/ripemd160.h \
+	crypto/sha1.cpp \
+	crypto/sha1.h \
+	crypto/sha256.cpp \
+	crypto/sha256.h \
+	crypto/sha512.cpp \
+	crypto/sha512.h
 
 # common: shared between dynamicd, and dynamic-qt and non-server tools
 libdynamic_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
