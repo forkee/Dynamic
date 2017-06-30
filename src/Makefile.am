@@ -20,12 +20,16 @@ LIBDYNAMIC_CRYPTO=crypto/libdynamic_crypto.a
 LIBDYNAMICQT=qt/libdynamicqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 LIBUNIVALUE=univalue/libunivalue.la
+LIBCRYPTOPP=cryptopp/libcryptopp.a
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
 $(LIBUNIVALUE): $(wildcard univalue/lib/*) $(wildcard univalue/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
+
+$(LIBCRYPTOPP):
+	@echo "Building CryptoPP Cryptographic Library..." && $(MAKE) -C $(@D) $(@F) CXX="$(CXX)" CC="$(CC)" OPT="$(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) $(AM_CPPFLAGS) $(CPPFLAGS)"
 
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
 # But to build the less dependent modules first, we manually select their order here:
@@ -170,6 +174,7 @@ DYNAMIC_CORE_H = \
   support/allocators/zeroafterfree.h \
   support/cleanse.h \
   support/lockedpool.h \
+  support/pagelocker.h \
   sync.h \
   threadsafety.h \
   timedata.h \
@@ -367,6 +372,7 @@ libdynamic_common_a_SOURCES = \
 libdynamic_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
 libdynamic_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_util_a_SOURCES = \
+  support/pagelocker.cpp \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \
@@ -416,7 +422,8 @@ dynamicd_LDADD = \
   $(LIBDYNAMIC_CRYPTO) \
   $(LIBLEVELDB) \
   $(LIBMEMENV) \
-  $(LIBSECP256K1)
+  $(LIBSECP256K1) \
+  $(LIBCRYPTOPP)
 
 if ENABLE_ZMQ
 dynamicd_LDADD += $(LIBDYNAMIC_ZMQ) $(ZMQ_LIBS)
@@ -460,7 +467,8 @@ dynamic_tx_LDADD = \
   $(LIBDYNAMIC_COMMON) \
   $(LIBDYNAMIC_UTIL) \
   $(LIBDYNAMIC_CRYPTO) \
-  $(LIBSECP256K1)
+  $(LIBSECP256K1)) \
+  $(LIBCRYPTOPP)
 
 dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
@@ -517,6 +525,7 @@ clean-local:
 	-$(MAKE) -C leveldb clean
 	-$(MAKE) -C secp256k1 clean
 	-$(MAKE) -C univalue clean
+	-$(MAKE) -C cryptopp clean
 	-rm -f leveldb/*/*.gcda leveldb/*/*.gcno leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno
 	-rm -f config/dynamic-config.* config/stamp-h1
 

@@ -5,7 +5,7 @@
 #include "support/pagelocker.h"
 
 #if defined(HAVE_CONFIG_H)
-#include "config/syscoin-config.h"
+#include "config/dynamic-config.h"
 #endif
 
 #ifdef WIN32
