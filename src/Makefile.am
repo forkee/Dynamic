@@ -65,6 +65,13 @@ endif
 .PHONY: FORCE check-symbols check-security
 # dynamic #
 DYNAMIC_CORE_H = \
+  syscoin/alias.h \
+  syscoin/cert.h \
+  syscoin/escrow.h \
+  syscoin/feedback.h \
+  syscoin/messagecrypter.h \
+  syscoin/message.h \
+  syscoin/offer.h \
   activedynode.h \
   addressindex.h \
   spentindex.h \
@@ -100,9 +107,6 @@ DYNAMIC_CORE_H = \
   core_io.h \
   core_memusage.h \
   dbwrapper.h \
-  dns/dns.h \
-  dns/dyndns.h \
-  dns/hooks.h \
   dynode.h \
   dynode-payments.h \
   dynode-sync.h \
@@ -203,6 +207,12 @@ libdynamic_util_a-clientversion.$(OBJEXT): obj/build.h
 libdynamic_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libdynamic_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_server_a_SOURCES = \
+  syscoin/alias.cpp \
+  syscoin/cert.cpp \
+  syscoin/escrow.cpp \
+  syscoin/message.cpp \
+  syscoin/messagecrypter.cpp \
+  syscoin/offer.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \
@@ -210,8 +220,6 @@ libdynamic_server_a_SOURCES = \
   checkpoints.cpp \
   checkforks.cpp \
   dbwrapper.cpp \
-  dns/dns.cpp \
-  dns/dyndns.cpp \
   governance.cpp \
   governance-classes.cpp \
   governance-object.cpp \

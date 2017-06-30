@@ -4252,7 +4252,29 @@ void CWallet::LockCoin(COutPoint& output)
     fAnonymizableTallyCachedNonDenom = false;
 }
 
+void CWallet::LockCoin(const COutPoint& output)
+{
+    AssertLockHeld(cs_wallet); // setLockedCoins
+    setLockedCoins.insert(output);
+    std::map<uint256, CWalletTx>::iterator it = mapWallet.find(output.hash);
+    if (it != mapWallet.end()) it->second.MarkDirty(); // recalculate all credits for this tx
+
+    fAnonymizableTallyCached = false;
+    fAnonymizableTallyCachedNonDenom = false;
+}
+
 void CWallet::UnlockCoin(COutPoint& output)
+{
+    AssertLockHeld(cs_wallet); // setLockedCoins
+    setLockedCoins.erase(output);
+    std::map<uint256, CWalletTx>::iterator it = mapWallet.find(output.hash);
+    if (it != mapWallet.end()) it->second.MarkDirty(); // recalculate all credits for this tx
+
+    fAnonymizableTallyCached = false;
+    fAnonymizableTallyCachedNonDenom = false;
+}
+
+void CWallet::UnlockCoin(const COutPoint& output)
 {
     AssertLockHeld(cs_wallet); // setLockedCoins
     setLockedCoins.erase(output);

@@ -46,14 +46,25 @@ class CChainParams
 public:
     enum Base58Type {
         PUBKEY_ADDRESS,
+        PUBKEY_ADDRESS_SYS,
+        PUBKEY_ADDRESS_ZEC,
         SCRIPT_ADDRESS,
-        SECRET_KEY,     // BIP16
-        EXT_PUBLIC_KEY, // BIP32
-        EXT_SECRET_KEY, // BIP32
+        SCRIPT_ADDRESS_ZEC,
+        SECRET_KEY,
+        SECRET_KEY_SYS,
+        EXT_PUBLIC_KEY,
+        EXT_SECRET_KEY,
 
         MAX_BASE58_TYPES
+    };  
+    
+    enum AddressType {
+		ADDRESS_OLDSYS,
+        ADDRESS_SYS,
+        ADDRESS_ZEC,
+        MAX_ADDRESS_TYPES
     };
-
+    
     const Consensus::Params& GetConsensus() const { return consensus; }
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
     const std::vector<unsigned char>& AlertKey() const { return vAlertPubKey; }
