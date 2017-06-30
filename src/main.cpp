@@ -48,6 +48,13 @@
 #include "versionbits.h"
 #include "checkforks.h"
 
+#include "syscoin/alias.h"
+#include "syscoin/offer.h"
+#include "syscoin/escrow.h"
+#include "syscoin/message.h"
+#include "syscoin/cert.h"
+#include "syscoin/offer.h"
+
 #include <atomic>
 #include <sstream>
 
@@ -1130,6 +1137,72 @@ static CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool 
     return nMinFee;
 }
 
+using namespace std; // Ugh...
+
+bool CheckSyscoinInputs(const CTransaction& tx, const CCoinsViewCache& inputs, bool fJustCheck, int nHeight=0)
+{
+	vector<vector<unsigned char> > vvchArgs;
+	int op;
+	int nOut;	
+	if(nHeight == 0)
+		nHeight = chainActive.Height();
+	string errorMessage;
+	if(tx.nVersion == GetSyscoinTxVersion())
+	{
+		bool good = true;
+		for(unsigned int j = 0;j<tx.vout.size();j++)
+		{
+			if(!good)
+				break;
+			if(DecodeAliasScript(tx.vout[j].scriptPubKey, op, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckAliasInputs(tx, op, j, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+		}
+		if(good)
+		{
+			if(DecodeCertTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckCertInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeEscrowTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckEscrowInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);		
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeMessageTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckMessageInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeOfferTx(tx, op, nOut, vvchArgs))
+			{	
+				errorMessage.clear();
+				good = CheckOfferInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	 
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+		}
+		if(!good)
+		{
+			return false;
+		}
+		
+	}
+	return true;	
+	
+}
+
 bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                               bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee,
                               std::vector<uint256>& vHashTxnToUncache, bool fDryRun)
@@ -1572,6 +1645,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             return error("%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), FormatStateMessage(state));
         }
+		
+		// SYSCOIN
+        if (!CheckSyscoinInputs(tx, view, true))
+			return false;
 
         // Remove conflicting transactions from the mempool
         BOOST_FOREACH(const CTxMemPool::txiter it, allConflicting)
@@ -2267,6 +2344,163 @@ static bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const CO
     return fClean;
 }
 
+bool DisconnectAlias(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = aliasFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED ALIAS TXN: alias=%s op=%s hash=%s  height=%d\n",
+		stringFromVch(vvchArgs[0]).c_str(),
+		aliasFromOp(op).c_str(),
+		tx.GetHash().ToString().c_str(),
+		pindex->nHeight);
+
+	
+	vector<CAliasIndex> vtxPos;
+	vector<CAliasPayment> vtxPaymentPos;
+	if(!paliasdb)
+		return false;
+	paliasdb->ReadAliasPayment(vvchArgs[0], vtxPaymentPos);
+	paliasdb->ReadAlias(vvchArgs[0], vtxPos);
+	if(vtxPos.empty())
+		return true;
+	const CAliasIndex &foundAlias = vtxPos.back();
+	while (!vtxPos.empty() && foundAlias.txHash == tx.GetHash())	
+		vtxPos.pop_back();
+	while (!vtxPaymentPos.empty() && vtxPaymentPos.back().txHash == tx.GetHash())	
+		vtxPaymentPos.pop_back();	
+
+	if(!paliasdb->WriteAlias(vvchArgs[0], vtxPos))
+		return error("DisconnectBlock() : failed to write to alias DB");
+	if(!paliasdb->WriteAliasPayment(vvchArgs[0], vtxPaymentPos))
+		return error("DisconnectBlock() : failed to write payment to alias DB");
+
+
+	return true;
+}
+
+bool DisconnectOffer(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = offerFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED offer TXN: offer=%s op=%s hash=%s  height=%d\n",
+			stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);    
+	
+	
+	COffer theOffer(tx);
+	vector<COffer> vtxPos;
+	if (theOffer.IsNull())
+		return false;
+
+	if(!pofferdb)
+		return false;
+	pofferdb->ReadOffer(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+		
+
+    // write new offer state to db
+
+	if(!pofferdb->WriteOffer(vvchArgs[0], vtxPos))
+		return error("DisconnectOffer() : failed to write to offer DB");
+	
+
+	return true;
+}
+
+bool DisconnectCertificate(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = certFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED CERT TXN: cert=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+
+	// make sure a DB record exists for this cert
+	vector<CCert> vtxPos;
+
+	if(!pcertdb)
+		return false;
+	pcertdb->ReadCert(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+		
+
+
+	// write new offer state to db
+
+	if(!pcertdb->WriteCert(vvchArgs[0], vtxPos))
+		return error("DisconnectCertificate() : failed to write to offer DB");
+
+
+	return true;
+}
+
+bool DisconnectEscrow(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = escrowFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED ESCROW TXN: escrow=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+	// make sure a DB record exists for this escrow
+	vector<CEscrow> vtxPos;
+
+	if(!pescrowdb)
+		return false;
+	pescrowdb->ReadEscrow(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+
+	// write new escrow state to db
+
+	if(!pescrowdb->WriteEscrow(vvchArgs[0], vtxPos))
+		return error("DisconnectEscrow() : failed to write to escrow DB");
+	
+
+
+	return true;
+}
+
+bool DisconnectMessage(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = messageFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED MESSAGE TXN: message=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+		   	opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+
+	// make sure a DB record exists for this msg
+	vector<CMessage> vtxPos;
+
+	if(!pmessagedb)
+		return false;
+	pmessagedb->ReadMessage(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+	// write new message state to db
+
+	if(!pmessagedb->WriteMessage(vvchArgs[0], vtxPos))
+		return error("DisconnectMessage() : failed to write to message DB");
+	
+
+	return true;
+}
+
 bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockIndex* pindex, CCoinsViewCache& view, bool* pfClean, const bool fWriteNames)
 {
     assert(pindex->GetBlockHash() == view.GetBestBlock());
@@ -2775,6 +3009,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL))
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                     tx.GetHash().ToString(), FormatStateMessage(state));
+			if (!CheckSyscoinInputs(tx, view, fJustCheck, pindex->nHeight))
+				return error("ConnectBlock(): CheckSyscoinInputs on %s failed",tx.GetHash().ToString());
+
             control.Add(vChecks);
         }
 
@@ -3165,10 +3402,34 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
-    // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
+		// SYSCOIN disconnect
+		if (tx.nVersion == GetSyscoinTxVersion()) {
+			vector<vector<unsigned char> > vvchArgs;
+			int op, nOut;
+			if(DecodeAliasTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectAlias(pindexDelete, tx, op, vvchArgs);	
+			}
+			if(DecodeOfferTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectOffer(pindexDelete, tx, op, vvchArgs); 
+			}
+			if(DecodeCertTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectCertificate(pindexDelete, tx, op, vvchArgs);				
+			}
+			if(DecodeEscrowTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectEscrow(pindexDelete, tx, op, vvchArgs);	
+			}
+			if(DecodeMessageTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectMessage(pindexDelete, tx, op, vvchArgs);	
+			}
+		}
     }
     return true;
 }
