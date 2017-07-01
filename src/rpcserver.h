@@ -200,15 +200,15 @@ extern UniValue dumpwallet(const UniValue& params, bool fHelp);
 extern UniValue dumphdinfo(const UniValue& params, bool fHelp);
 extern UniValue importwallet(const UniValue& params, bool fHelp);
 
-// START_SYSCOIN service rpc functions
-extern UniValue aliasnew(const UniValue& params, bool fHelp);
-extern UniValue aliasupdate(const UniValue& params, bool fHelp);
-extern UniValue aliaslist(const UniValue& params, bool fHelp);
-extern UniValue aliasaffiliates(const UniValue& params, bool fHelp);
-extern UniValue aliasinfo(const UniValue& params, bool fHelp);
-extern UniValue aliashistory(const UniValue& params, bool fHelp);
-extern UniValue aliasfilter(const UniValue& params, bool fHelp);
-extern UniValue aliaspay(const UniValue& params, bool fHelp);
+// START_DYNAMIC service rpc functions
+extern UniValue identitynew(const UniValue& params, bool fHelp);
+extern UniValue identityupdate(const UniValue& params, bool fHelp);
+extern UniValue identitylist(const UniValue& params, bool fHelp);
+extern UniValue identityaffiliates(const UniValue& params, bool fHelp);
+extern UniValue identityinfo(const UniValue& params, bool fHelp);
+extern UniValue identityhistory(const UniValue& params, bool fHelp);
+extern UniValue identityfilter(const UniValue& params, bool fHelp);
+extern UniValue identitypay(const UniValue& params, bool fHelp);
 extern UniValue generatepublickey(const UniValue& params, bool fHelp);
 
 
@@ -252,7 +252,7 @@ extern UniValue messagelist(const UniValue& params, bool fHelp);
 extern UniValue messagesentlist(const UniValue& params, bool fHelp);
 extern UniValue messagehistory(const UniValue& params, bool fHelp);
 
-// END_SYSCOIN service rpc functions
+// END_DYNAMIC service rpc functions
 
 extern UniValue getgenerate(const UniValue& params, bool fHelp); // in rpcmining.cpp
 extern UniValue setgenerate(const UniValue& params, bool fHelp);

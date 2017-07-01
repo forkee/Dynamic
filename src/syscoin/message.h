@@ -28,8 +28,8 @@ static const unsigned int MAX_ENCRYPTED_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH + 85
 class CMessage {
 public:
 	std::vector<unsigned char> vchMessage;
-	std::vector<unsigned char> vchAliasTo;
-	std::vector<unsigned char> vchAliasFrom;
+	std::vector<unsigned char> vchIdentityTo;
+	std::vector<unsigned char> vchIdentityFrom;
 	std::vector<unsigned char> vchSubject;
 	std::vector<unsigned char> vchMessageTo;
 	std::vector<unsigned char> vchMessageFrom;
@@ -52,16 +52,16 @@ public:
 		READWRITE(txHash);
 		READWRITE(VARINT(nHeight));
 		READWRITE(vchMessage);
-        READWRITE(vchAliasTo);
-		READWRITE(vchAliasFrom);
+        READWRITE(vchIdentityTo);
+		READWRITE(vchIdentityFrom);
 		READWRITE(bHex);
 		
 	}
 
     friend bool operator==(const CMessage &a, const CMessage &b) {
         return (
-        a.vchAliasTo == b.vchAliasTo
-		&& a.vchAliasFrom == b.vchAliasFrom
+        a.vchIdentityTo == b.vchIdentityTo
+		&& a.vchIdentityFrom == b.vchIdentityFrom
 		&& a.vchSubject == b.vchSubject
 		&& a.vchMessageTo == b.vchMessageTo
 		&& a.vchMessageFrom == b.vchMessageFrom
@@ -73,8 +73,8 @@ public:
     }
 
     CMessage operator=(const CMessage &b) {
-        vchAliasTo = b.vchAliasTo;
-		vchAliasFrom = b.vchAliasFrom;
+        vchIdentityTo = b.vchIdentityTo;
+		vchIdentityFrom = b.vchIdentityFrom;
 		vchSubject = b.vchSubject;
 		vchMessageTo = b.vchMessageTo;
 		vchMessageFrom = b.vchMessageFrom;
@@ -89,8 +89,8 @@ public:
         return !(a == b);
     }
 
-    void SetNull() {bHex = false; vchMessage.clear(); txHash.SetNull(); nHeight = 0; vchAliasTo.clear(); vchAliasFrom.clear(); vchSubject.clear(); vchMessageTo.clear();vchMessageFrom.clear();}
-    bool IsNull() const { return (bHex && vchMessage.empty() && txHash.IsNull() && nHeight == 0 && vchAliasTo.empty() && vchAliasFrom.empty()); }
+    void SetNull() {bHex = false; vchMessage.clear(); txHash.SetNull(); nHeight = 0; vchIdentityTo.clear(); vchIdentityFrom.clear(); vchSubject.clear(); vchMessageTo.clear();vchMessageFrom.clear();}
+    bool IsNull() const { return (bHex && vchMessage.empty() && txHash.IsNull() && nHeight == 0 && vchIdentityTo.empty() && vchIdentityFrom.empty()); }
     bool UnserializeFromTx(const CTransaction &tx);
 	bool UnserializeFromData(const std::vector<unsigned char> &vchData, const std::vector<unsigned char> &vchHash);
 	void Serialize(std::vector<unsigned char>& vchData);

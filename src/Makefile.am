@@ -69,7 +69,7 @@ endif
 .PHONY: FORCE check-symbols check-security
 # dynamic #
 DYNAMIC_CORE_H = \
-  syscoin/alias.h \
+  syscoin/identity.h \
   syscoin/cert.h \
   syscoin/escrow.h \
   syscoin/feedback.h \
@@ -213,12 +213,13 @@ libdynamic_util_a-clientversion.$(OBJEXT): obj/build.h
 libdynamic_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libdynamic_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_server_a_SOURCES = \
-  syscoin/alias.cpp \
+  syscoin/identity.cpp \
   syscoin/cert.cpp \
   syscoin/escrow.cpp \
   syscoin/message.cpp \
   syscoin/messagecrypter.cpp \
   syscoin/offer.cpp \
+  dns/hooks.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \

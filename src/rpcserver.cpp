@@ -404,7 +404,7 @@ static const CRPCCommand vRPCCommands[] =
     { "Wallet",             "walletlock",             &walletlock,             true  },
     { "Wallet",             "walletpassphrasechange", &walletpassphrasechange, true  },
     { "Wallet",             "walletpassphrase",       &walletpassphrase,       true  },
-    /* Syscoin Protocol */
+    /* Dynamic Protocol */
     // We don't put it in the call table at all
     
 #endif // ENABLE_WALLET

@@ -43,10 +43,10 @@
 
 using namespace std; // Somebody, give me a chocolate
 
-// SYSCOIN services
-extern int IndexOfAliasOutput(const CTransaction& tx);
-extern bool IsSyscoinScript(const CScript& scriptPubKey, int &op, vector<vector<unsigned char> > &vvchArgs);
-extern int GetSyscoinTxVersion();
+// DYNAMIC services
+extern int IndexOfIdentityOutput(const CTransaction& tx);
+extern bool IsDynamicScript(const CScript& scriptPubKey, int &op, vector<vector<unsigned char> > &vvchArgs);
+extern int GetDynamicTxVersion();
 extern vector<unsigned char> vchFromString(const string &str);
 
 /** Transaction fee set by the user */
@@ -2511,7 +2511,7 @@ bool less_then_denom (const COutput& out1, const COutput& out2)
 }
 
 bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins,
-                                 std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, bool bAliasPay) const
+                                 std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, bool bIdentityPay) const
 {
     setCoinsRet.clear();
     nValueRet = 0;
@@ -2548,12 +2548,12 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int
             int i = output.i;
             CAmount n = pcoin->vout[i].nValue;
 			
-			// SYSCOIN txs are unspendable unless input to another syscoin tx (passed into createtransaction)
-			if(pcoin->nVersion == GetSyscoinTxVersion())
+			// DYNAMIC txs are unspendable unless input to another dynamic tx (passed into createtransaction)
+			if(pcoin->nVersion == GetDynamicTxVersion())
 			{
 				int op;
 				vector<vector<unsigned char> > vvchArgs;
-				if (pcoin->vout.size() >= i && IsSyscoinScript(pcoin->vout[i].scriptPubKey, op, vvchArgs) && op != OP_ALIAS_PAYMENT)
+				if (pcoin->vout.size() >= i && IsDynamicScript(pcoin->vout[i].scriptPubKey, op, vvchArgs) && op != OP_IDENTITY_PAYMENT)
 					continue;
 			}
 		
@@ -2643,7 +2643,7 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int
     return true;
 }
 
-bool CWallet::SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl, AvailableCoinsType nCoinType, bool fUseInstantSend, bool bAliasPay) const
+bool CWallet::SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, const CCoinControl* coinControl, AvailableCoinsType nCoinType, bool fUseInstantSend, bool bIdentityPay) const
 {
     // Note: this function should never be used for "always free" tx types like pstx
 
@@ -2721,12 +2721,12 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const 
         if (it != mapWallet.end())
         {
             const CWalletTx* pcoin = &it->second;
-			// SYSCOIN txs are unspendable unless input to another syscoin tx (passed into createtransaction)
-			if(pcoin->nVersion == GetSyscoinTxVersion())
+			// DYNAMIC txs are unspendable unless input to another dynamic tx (passed into createtransaction)
+			if(pcoin->nVersion == GetDynamicTxVersion())
 			{
 				int op;
 				vector<vector<unsigned char> > vvchArgs;
-				if (pcoin->vout.size() >= outpoint.n && IsSyscoinScript(pcoin->vout[outpoint.n].scriptPubKey, op, vvchArgs) && op != OP_ALIAS_PAYMENT)
+				if (pcoin->vout.size() >= outpoint.n && IsDynamicScript(pcoin->vout[outpoint.n].scriptPubKey, op, vvchArgs) && op != OP_IDENTITY_PAYMENT)
 					continue;
 			}
             // Clearly invalid input, fail
@@ -2748,9 +2748,9 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const 
     }
 
     bool res = nTargetValue <= nValueFromPresetInputs ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 10, vCoins, setCoinsRet, nValueRet, bAliasPay) ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, vCoins, setCoinsRet, nValueRet, bAliasPay) ||
-        (bSpendZeroConfChange && SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, vCoins, setCoinsRet, nValueRet, bAliasPay));
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 10, vCoins, setCoinsRet, nValueRet, bIdentityPay) ||
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, vCoins, setCoinsRet, nValueRet, bIdentityPay) ||
+        (bSpendZeroConfChange && SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, vCoins, setCoinsRet, nValueRet, bIdentityPay));
 
     // because SelectCoinsMinConf clears the setCoinsRet, we now add the possible inputs to the coinset
     setCoinsRet.insert(setPresetCoins.begin(), setPresetCoins.end());
@@ -3217,26 +3217,26 @@ bool CWallet::ConvertList(std::vector<CTxIn> vecTxIn, std::vector<CAmount>& vecA
 
 bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet,
                                 int& nChangePosRet, std::string& strFailReason, const CCoinControl* coinControl, bool sign, AvailableCoinsType nCoinType, bool fUseInstantSend,
-                                const CWalletTx* wtxInAlias, int nTxOutAlias, bool sysTx, const CWalletTx* wtxInLinkAlias, int nTxOutLinkAlias, bool bAliasPay)
+                                const CWalletTx* wtxInIdentity, int nTxOutIdentity, bool sysTx, const CWalletTx* wtxInLinkIdentity, int nTxOutLinkIdentity, bool bIdentityPay)
 {
     CAmount nFeePay = fUseInstantSend ? CTxLockRequest().GetMinFee() : 0;
 
     CAmount nValue = 0;
-    // SYSCOIN: get output amount of input transactions for syscoin service calls
-	if(wtxInAlias != NULL)
+    // DYNAMIC: get output amount of input transactions for dynamic service calls
+	if(wtxInIdentity != NULL)
 	{
-		if (nTxOutAlias < 0)
+		if (nTxOutIdentity < 0)
 		{
-			strFailReason = _("Can't determine type of alias input into syscoin service transaction");
+			strFailReason = _("Can't determine type of identity input into dynamic service transaction");
 			return false;
 		}
 	}
 	
-	if(wtxInLinkAlias != NULL)
+	if(wtxInLinkIdentity != NULL)
 	{
-		if (nTxOutLinkAlias < 0)
+		if (nTxOutLinkIdentity < 0)
 		{
-			strFailReason = _("Can't determine type of linked alias input into syscoin service transaction");
+			strFailReason = _("Can't determine type of linked identity input into dynamic service transaction");
 			return false;
 		}
 	}
@@ -3263,9 +3263,9 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
     wtxNew.fTimeReceivedIsTxTime = true;
     wtxNew.BindWallet(this);
     CMutableTransaction txNew;
-	// SYSCOIN: set syscoin tx version if its a syscoin service call
+	// DYNAMIC: set dynamic tx version if its a dynamic service call
 	if(sysTx)
-		txNew.nVersion = GetSyscoinTxVersion();
+		txNew.nVersion = GetDynamicTxVersion();
     
     // Discourage fee sniping.
     //
@@ -3336,31 +3336,31 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
 
                     if (txout.IsDust(::minRelayTxFee))
                     {
-						// SYSCOIN pay to alias
+						// DYNAMIC pay to identity
 						CRecipient myrecipient = recipient;
 						CTxDestination payDest;
 						int op;
 						vector<vector<unsigned char> > vvchArgs;
-						if (!myrecipient.scriptPubKey.IsUnspendable() && !IsSyscoinScript(myrecipient.scriptPubKey, op, vvchArgs)) {
+						if (!myrecipient.scriptPubKey.IsUnspendable() && !IsDynamicScript(myrecipient.scriptPubKey, op, vvchArgs)) {
 							if (ExtractDestination(myrecipient.scriptPubKey, payDest)) 
 							{
 								CDynamicAddress address = CDynamicAddress(payDest);
 								address = CDynamicAddress(address.ToString());
-								if(address.isAlias)
+								if(address.isIdentity)
 								{
 									myrecipient.scriptPubKey = GetScriptForDestination(payDest);
 									if(!address.vchRedeemScript.empty())
 										myrecipient.scriptPubKey = CScript(address.vchRedeemScript.begin(), address.vchRedeemScript.end());
 									CScript scriptPubKey;
-									scriptPubKey << CScript::EncodeOP_N(OP_ALIAS_PAYMENT) << vchFromString(address.aliasName) << OP_2DROP;
+									scriptPubKey << CScript::EncodeOP_N(OP_IDENTITY_PAYMENT) << vchFromString(address.identityName) << OP_2DROP;
 									scriptPubKey += myrecipient.scriptPubKey;
 									myrecipient = {scriptPubKey, myrecipient.nAmount, false/*myrecipient.fSubtractFeeFromAmount*/};
-									txNew.nVersion = GetSyscoinTxVersion();				
+									txNew.nVersion = GetDynamicTxVersion();				
 								}
 							}
 						}
 					
-						// SYSCOIN
+						// DYNAMIC
 						if (myrecipient.fSubtractFeeFromAmount && nFeeRet > 0)
                         {
                             if (txout.nValue < 0)
@@ -3375,17 +3375,17 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
                     txNew.vout.push_back(txout);
                 }
 				
-				// SYSCOIN input credit from input tx
+				// DYNAMIC input credit from input tx
 				int64_t nWtxinCredit = 0;
-				if(wtxInAlias != NULL)
-					nWtxinCredit += wtxInAlias->vout[nTxOutAlias].nValue;
-				if(wtxInLinkAlias != NULL)
-					nWtxinCredit += wtxInLinkAlias->vout[nTxOutLinkAlias].nValue;
+				if(wtxInIdentity != NULL)
+					nWtxinCredit += wtxInIdentity->vout[nTxOutIdentity].nValue;
+				if(wtxInLinkIdentity != NULL)
+					nWtxinCredit += wtxInLinkIdentity->vout[nTxOutLinkIdentity].nValue;
 								
                 // Choose coins to use
                 std::set<std::pair<const CWalletTx*,unsigned int> > setCoins;
                 CAmount nValueIn = 0;
-                if ((nValueToSelect-nWtxinCredit) > 0 && !SelectCoins(nValueToSelect-nWtxinCredit, setCoins, nValueIn, coinControl, nCoinType, fUseInstantSend, bAliasPay))
+                if ((nValueToSelect-nWtxinCredit) > 0 && !SelectCoins(nValueToSelect-nWtxinCredit, setCoins, nValueIn, coinControl, nCoinType, fUseInstantSend, bIdentityPay))
                 {
                     if (nCoinType == ONLY_NOT1000IFDN) {
                         strFailReason = _("Unable to locate enough funds for this transaction that are not equal 1000 DYN.");
@@ -3409,17 +3409,17 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
                     return false;
                 }
 
-				// SYSCOIN attach input TX
+				// DYNAMIC attach input TX
 				nValueIn += nWtxinCredit;
 				vector<pair<const CWalletTx*, unsigned int> > vecCoins(
 							setCoins.begin(), setCoins.end());
 							
-				if(wtxInAlias != NULL)
-					vecCoins.insert(vecCoins.begin(), make_pair(wtxInAlias, nTxOutAlias));
-				if(wtxInLinkAlias != NULL)
-					vecCoins.insert(vecCoins.begin(), make_pair(wtxInLinkAlias, nTxOutLinkAlias));
+				if(wtxInIdentity != NULL)
+					vecCoins.insert(vecCoins.begin(), make_pair(wtxInIdentity, nTxOutIdentity));
+				if(wtxInLinkIdentity != NULL)
+					vecCoins.insert(vecCoins.begin(), make_pair(wtxInLinkIdentity, nTxOutLinkIdentity));
 				
-				// SYSCOIN
+				// DYNAMIC
                 BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
                 {
                     CAmount nCredit = pcoin.first->vout[pcoin.second].nValue;
@@ -3474,7 +3474,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
                             //  post-backup change.
 
                             // Reserve a new key pair from key pool
-							// SYSCOIN pay to input destination as change
+							// DYNAMIC pay to input destination as change
 							CTxDestination payDest;
 							// the last input is always the one that gets the change since it wasn't fully spent
 							int nLastIndex = vecCoins.size()-1;
@@ -3485,8 +3485,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
 								scriptChange = GetScriptForDestination(payDest);
 								address = CDynamicAddress(payDest);
 								address = CDynamicAddress(address.ToString());
-								// if paying from an alias then send change back to sender
-								if(address.isAlias)
+								// if paying from an identity then send change back to sender
+								if(address.isIdentity)
 								{
 									scriptChange = GetScriptForDestination(payDest);
 									if(!address.vchRedeemScript.empty())
@@ -3512,14 +3512,14 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
 							}                        	
 						}
 
-						// SYSCOIN change as a alias payment				
-						if(address.isAlias && (wtxInAlias == NULL || vecCoins.size() > 1))
+						// DYNAMIC change as a identity payment				
+						if(address.isIdentity && (wtxInIdentity == NULL || vecCoins.size() > 1))
 						{
 							CScript scriptChangeOrig;
-							scriptChangeOrig << CScript::EncodeOP_N(OP_ALIAS_PAYMENT) << vchFromString(address.aliasName) << OP_2DROP;
+							scriptChangeOrig << CScript::EncodeOP_N(OP_IDENTITY_PAYMENT) << vchFromString(address.identityName) << OP_2DROP;
 							scriptChangeOrig += scriptChange;
 							scriptChange = scriptChangeOrig;
-							txNew.nVersion = GetSyscoinTxVersion();				
+							txNew.nVersion = GetDynamicTxVersion();				
 						}
 
                         newTxOut = CTxOut(nChange, scriptChange);
@@ -3565,7 +3565,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletT
                 else
                     reservekey.ReturnKey();
 
-				// SYSCOIN use max-2 because we want RBF replacement to be on by default on this wallet
+				// DYNAMIC use max-2 because we want RBF replacement to be on by default on this wallet
                 // Fill vin
                 //
                 // Note how the sequence number is set to max()-2 so that the

@@ -48,7 +48,7 @@
 #include "versionbits.h"
 #include "checkforks.h"
 
-#include "syscoin/alias.h"
+#include "syscoin/identity.h"
 #include "syscoin/offer.h"
 #include "syscoin/escrow.h"
 #include "syscoin/message.h"
@@ -1139,7 +1139,7 @@ static CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool 
 
 using namespace std; // Ugh...
 
-bool CheckSyscoinInputs(const CTransaction& tx, const CCoinsViewCache& inputs, bool fJustCheck, int nHeight=0)
+bool CheckDynamicInputs(const CTransaction& tx, const CCoinsViewCache& inputs, bool fJustCheck, int nHeight=0)
 {
 	vector<vector<unsigned char> > vvchArgs;
 	int op;
@@ -1147,17 +1147,17 @@ bool CheckSyscoinInputs(const CTransaction& tx, const CCoinsViewCache& inputs, b
 	if(nHeight == 0)
 		nHeight = chainActive.Height();
 	string errorMessage;
-	if(tx.nVersion == GetSyscoinTxVersion())
+	if(tx.nVersion == GetDynamicTxVersion())
 	{
 		bool good = true;
 		for(unsigned int j = 0;j<tx.vout.size();j++)
 		{
 			if(!good)
 				break;
-			if(DecodeAliasScript(tx.vout[j].scriptPubKey, op, vvchArgs))
+			if(DecodeIdentityScript(tx.vout[j].scriptPubKey, op, vvchArgs))
 			{
 				errorMessage.clear();
-				good = CheckAliasInputs(tx, op, j, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);
+				good = CheckIdentityInputs(tx, op, j, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);
 				if(fDebug && !errorMessage.empty())
 					LogPrintf("%s\n", errorMessage.c_str());
 			}
@@ -1646,8 +1646,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
                 __func__, hash.ToString(), FormatStateMessage(state));
         }
 		
-		// SYSCOIN
-        if (!CheckSyscoinInputs(tx, view, true))
+		// DYNAMIC
+        if (!CheckDynamicInputs(tx, view, true))
 			return false;
 
         // Remove conflicting transactions from the mempool
@@ -2344,34 +2344,34 @@ static bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const CO
     return fClean;
 }
 
-bool DisconnectAlias(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
-	string opName = aliasFromOp(op);
+bool DisconnectIdentity(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = identityFromOp(op);
 	if(fDebug)
-		LogPrintf("DISCONNECTED ALIAS TXN: alias=%s op=%s hash=%s  height=%d\n",
+		LogPrintf("DISCONNECTED IDENTITY TXN: identity=%s op=%s hash=%s  height=%d\n",
 		stringFromVch(vvchArgs[0]).c_str(),
-		aliasFromOp(op).c_str(),
+		identityFromOp(op).c_str(),
 		tx.GetHash().ToString().c_str(),
 		pindex->nHeight);
 
 	
-	vector<CAliasIndex> vtxPos;
-	vector<CAliasPayment> vtxPaymentPos;
-	if(!paliasdb)
+	vector<CIdentityIndex> vtxPos;
+	vector<CIdentityPayment> vtxPaymentPos;
+	if(!pidentitydb)
 		return false;
-	paliasdb->ReadAliasPayment(vvchArgs[0], vtxPaymentPos);
-	paliasdb->ReadAlias(vvchArgs[0], vtxPos);
+	pidentitydb->ReadIdentityPayment(vvchArgs[0], vtxPaymentPos);
+	pidentitydb->ReadIdentity(vvchArgs[0], vtxPos);
 	if(vtxPos.empty())
 		return true;
-	const CAliasIndex &foundAlias = vtxPos.back();
-	while (!vtxPos.empty() && foundAlias.txHash == tx.GetHash())	
+	const CIdentityIndex &foundIdentity = vtxPos.back();
+	while (!vtxPos.empty() && foundIdentity.txHash == tx.GetHash())	
 		vtxPos.pop_back();
 	while (!vtxPaymentPos.empty() && vtxPaymentPos.back().txHash == tx.GetHash())	
 		vtxPaymentPos.pop_back();	
 
-	if(!paliasdb->WriteAlias(vvchArgs[0], vtxPos))
-		return error("DisconnectBlock() : failed to write to alias DB");
-	if(!paliasdb->WriteAliasPayment(vvchArgs[0], vtxPaymentPos))
-		return error("DisconnectBlock() : failed to write payment to alias DB");
+	if(!pidentitydb->WriteIdentity(vvchArgs[0], vtxPos))
+		return error("DisconnectBlock() : failed to write to identity DB");
+	if(!pidentitydb->WriteIdentityPayment(vvchArgs[0], vtxPaymentPos))
+		return error("DisconnectBlock() : failed to write payment to identity DB");
 
 
 	return true;
@@ -3009,8 +3009,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL))
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                     tx.GetHash().ToString(), FormatStateMessage(state));
-			if (!CheckSyscoinInputs(tx, view, fJustCheck, pindex->nHeight))
-				return error("ConnectBlock(): CheckSyscoinInputs on %s failed",tx.GetHash().ToString());
+			if (!CheckDynamicInputs(tx, view, fJustCheck, pindex->nHeight))
+				return error("ConnectBlock(): CheckDynamicInputs on %s failed",tx.GetHash().ToString());
 
             control.Add(vChecks);
         }
@@ -3405,13 +3405,13 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
     // 0-confirmed or conflicted:
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
-		// SYSCOIN disconnect
-		if (tx.nVersion == GetSyscoinTxVersion()) {
+		// DYNAMIC disconnect
+		if (tx.nVersion == GetDynamicTxVersion()) {
 			vector<vector<unsigned char> > vvchArgs;
 			int op, nOut;
-			if(DecodeAliasTx(tx, op, nOut, vvchArgs))
+			if(DecodeIdentityTx(tx, op, nOut, vvchArgs))
 			{
-				DisconnectAlias(pindexDelete, tx, op, vvchArgs);	
+				DisconnectIdentity(pindexDelete, tx, op, vvchArgs);	
 			}
 			if(DecodeOfferTx(tx, op, nOut, vvchArgs))
 			{
