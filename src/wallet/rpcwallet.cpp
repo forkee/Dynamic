@@ -6,6 +6,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "syscoin/alias.h"
 #include "base58.h"
 #include "chain.h"
 #include "core_io.h"
@@ -30,6 +31,20 @@
 
 int64_t nWalletUnlockTime;
 static CCriticalSection cs_nWalletUnlockTime;
+
+using namespace std; // God, why?
+
+// SYSCOIN
+extern bool DecodeAliasTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch, bool payment);
+extern bool DecodeOfferTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeCertTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeMessageTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeEscrowTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool CheckAliasInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckOfferInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckCertInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckMessageInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckEscrowInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
 
 std::string HelpRequiringPassphrase()
 {
@@ -368,6 +383,93 @@ UniValue getaddressesbyaccount(const UniValue& params, bool fHelp)
             ret.push_back(address.ToString());
     }
     return ret;
+}
+
+// SYSCOIN: Send service transactions
+void SendMoneySyscoin(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxAliasIn=NULL, int nTxOutAlias = 0, bool syscoinMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxLinkAliasIn=NULL, int nTxOutLinkAlias = 0)
+{
+    CAmount curBalance = pwalletMain->GetBalance();
+
+    // Check amount
+    if (nValue <= 0)
+        throw runtime_error("Invalid amount");
+
+    if (nValue > curBalance)
+        throw runtime_error(strprintf("Insufficient funds. Amount requested %f, wallet balance %f", ValueFromAmount(nValue).get_real(), ValueFromAmount(curBalance).get_real()));
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwalletMain);
+    CAmount nFeeRequired;
+    std::string strError;
+    int nChangePosRet = -1;
+    
+    //    bool CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosRet,
+    //                       std::string& strFailReason, const CCoinControl *coinControl = NULL, bool sign = true, AvailableCoinsType nCoinType=ALL_COINS, bool fUseInstantSend=false,
+    //                       const CWalletTx* wtxIn=NULL, int nOut = 0, bool sysTx = false, const CWalletTx* wtxLinkIn=NULL, int nLinkOut = 0, bool bAliasPay=false);
+	
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, coinControl, !syscoinMultiSigTx, ALL_COINS, false, wtxAliasIn, nTxOutAlias, true, wtxLinkAliasIn, nTxOutLinkAlias)) {
+        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw runtime_error(strError);
+    }
+	// run a check on the inputs without putting them into the db, just to ensure it will go into the mempool without issues and cause wallet annoyance
+	vector<vector<unsigned char> > vvch;
+	int op, nOut;
+	bool fJustCheck = true;
+	string errorMessage="";
+	CCoinsViewCache inputs(pcoinsTip);
+	for(unsigned int j = 0;j<wtxNew.vout.size();j++)
+	{
+		if(DecodeAliasScript(wtxNew.vout[j].scriptPubKey, op, vvch))
+		{
+			CheckAliasInputs(wtxNew, op, j, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+			if(!errorMessage.empty())
+				throw runtime_error(errorMessage.c_str());
+			CheckAliasInputs(wtxNew,  op, j, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+			if(!errorMessage.empty())
+				throw runtime_error(errorMessage.c_str());
+		}
+	}
+	if(DecodeCertTx(wtxNew, op, nOut, vvch))
+	{
+		CheckCertInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckCertInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	if(DecodeEscrowTx(wtxNew, op, nOut, vvch))
+	{
+		CheckEscrowInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckEscrowInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	if(DecodeOfferTx(wtxNew, op, nOut, vvch))		
+	{
+		CheckOfferInputs(wtxNew,  op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckOfferInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+
+	}
+	if(DecodeMessageTx(wtxNew, op, nOut, vvch))
+	{
+		CheckMessageInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckMessageInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	
+    if (!syscoinMultiSigTx && !pwalletMain->CommitTransaction(wtxNew, reservekey))
+        throw runtime_error("SYSCOIN_RPC_ERROR ERRCODE: 9000 - " + _("The Syscoin alias you are trying to use for this transaction is invalid or has been updated and not confirmed yet! Please wait a block and try again..."));
 }
 
 static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, bool fUseInstantSend=false, bool fUsePrivateSend=false)
