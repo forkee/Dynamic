@@ -404,19 +404,10 @@ static const CRPCCommand vRPCCommands[] =
     { "Wallet",             "walletlock",             &walletlock,             true  },
     { "Wallet",             "walletpassphrasechange", &walletpassphrasechange, true  },
     { "Wallet",             "walletpassphrase",       &walletpassphrase,       true  },
-     /* Decentralised DNS */
-    { "DDNS",               "name_scan",              &name_scan,              true  },
-    { "DDNS",               "name_filter",            &name_filter,            true  },
-    { "DDNS",               "name_show",              &name_show,              true  },
-    { "DDNS",               "name_history",           &name_history,           true  },
-    { "DDNS",               "name_mempool",           &name_mempool,           true  },
-    { "DDNS",               "name_new",               &name_new,               true  },
-    { "DDNS",               "name_update",            &name_update,            true  },
-    { "DDNS",               "name_delete",            &name_delete,            true  },
-    { "DDNS",               "name_list",              &name_list,              true  },
+    /* Syscoin Protocol */
+    // We don't put it in the call table at all
+    
 #endif // ENABLE_WALLET
-    /* Not shown in help */
-    { "Hidden", "name_debug", &name_debug, false },
 };
 
 CRPCTable::CRPCTable()

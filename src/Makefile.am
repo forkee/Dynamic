@@ -116,6 +116,7 @@ DYNAMIC_CORE_H = \
   dynode-sync.h \
   dynodeman.h \
   dynodeconfig.h \
+  dns/hooks.h \
   flat-database.h \
   governance.h \
   governance-classes.h \
