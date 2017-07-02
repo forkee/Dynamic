@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "offer.h"
 #include "identity.h"
 #include "escrow.h"
@@ -13,6 +19,7 @@
 #include "wallet/wallet.h"
 #include "consensus/validation.h"
 #include "chainparams.h"
+
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/xpressive/xpressive_dynamic.hpp>
 #include <boost/lexical_cast.hpp>
@@ -23,15 +30,17 @@
 #include <boost/algorithm/hex.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+
 using namespace std;
 
-extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0)
-;
+extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0);
+
 bool DisconnectIdentity(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs );
 bool DisconnectOffer(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs );
 bool DisconnectCertificate(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs );
 bool DisconnectMessage(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs );
 bool DisconnectEscrow(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs );
+
 bool IsOfferOp(int op) {
 	return op == OP_OFFER_ACTIVATE
         || op == OP_OFFER_UPDATE
@@ -39,12 +48,12 @@ bool IsOfferOp(int op) {
 }
 
 bool ValidatePaymentOptionsMask(const uint32_t paymentOptionsMask) {
-	uint32_t maxVal = PAYMENTOPTION_DYN | PAYMENTOPTION_BTC | PAYMENTOPTION_ZEC;
+	uint32_t maxVal = PAYMENTOPTION_DYN | PAYMENTOPTION_BTC | PAYMENTOPTION_SEQ;
 	return !(paymentOptionsMask < 1 || paymentOptionsMask > maxVal);
 }
 
 bool IsValidPaymentOption(const uint32_t paymentOptionsMask) {
-	return (paymentOptionsMask == PAYMENTOPTION_DYN || paymentOptionsMask == PAYMENTOPTION_BTC || paymentOptionsMask == PAYMENTOPTION_ZEC);
+	return (paymentOptionsMask == PAYMENTOPTION_DYN || paymentOptionsMask == PAYMENTOPTION_BTC || paymentOptionsMask == PAYMENTOPTION_SEQ);
 }
 
 bool ValidatePaymentOptionsString(const std::string &paymentOptionsString) {
@@ -52,7 +61,7 @@ bool ValidatePaymentOptionsString(const std::string &paymentOptionsString) {
 	vector<string> strs;
 	boost::split(strs, paymentOptionsString, boost::is_any_of("+"));
 	for (size_t i = 0; i < strs.size(); i++) {
-		if(strs[i].compare("BTC") != 0 && strs[i].compare("DYN") != 0 && strs[i].compare("ZEC") != 0) {
+		if(strs[i].compare("BTC") != 0 && strs[i].compare("DYN") != 0 && strs[i].compare("SEQ") != 0) {
 			retval = false;
 			break;
 		}
@@ -71,8 +80,8 @@ uint32_t GetPaymentOptionsMaskFromString(const std::string &paymentOptionsString
 		else if(!strs[i].compare("BTC")) {
 			retval |= PAYMENTOPTION_BTC;
 		}
-		else if(!strs[i].compare("ZEC")) {
-			retval |= PAYMENTOPTION_ZEC;
+		else if(!strs[i].compare("SEQ")) {
+			retval |= PAYMENTOPTION_SEQ;
 		}
 		else return 0;
 	}
@@ -1440,7 +1449,7 @@ UniValue offernew(const UniValue& params, bool fHelp) {
 						"<description> description, 1 KB max.\n"
 						"<currency> The currency code that you want your offer to be in ie: USD.\n"
 						"<cert. guid> Set this to the guid of a certificate you wish to sell\n"
-						"<paymentOptions> 'DYN' to accept DYN only, 'BTC' for BTC only, 'ZEC' for zcash only, or a |-delimited string to accept multiple currencies (e.g. 'BTC|DYN' to accept BTC or DYN). Leave empty for default. Defaults to 'DYN'.\n"
+						"<paymentOptions> 'DYN' to accept Dynamic only, 'BTC' for Bitcoin only, 'SEQ' for Sequence only, or a |-delimited string to accept multiple currencies (e.g. 'BTC|DYN' to accept BTC or DYN). Leave empty for default. Defaults to 'DYN'.\n"
 						"<geolocation> set to your geolocation. Defaults to empty. \n"
 						"<safe search> set to No if this offer should only show in the search when safe search is not selected. Defaults to Yes (offer shows with or without safe search selected in search lists).\n"
 						"<private> set to 1 if this offer should be private not be searchable. Defaults to 0.\n"
@@ -3347,20 +3356,20 @@ bool BuildOfferJson(const COffer& theOffer, const CIdentityIndex &identity, UniV
 UniValue offeracceptlist(const UniValue& params, bool fHelp) {
     if (fHelp || 3 < params.size())
         throw runtime_error("offeracceptlist [\"identity\",...] [<acceptguid>] [<privatekey>]\n"
-                "list offer purchases that an array of identityes own. Set of identityes to look up based on identity, and private key to decrypt any data found in offer purchase.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list offer purchases that an array of identities own. Set of identities to look up based on identity, and private key to decrypt any data found in offer purchase.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -3368,7 +3377,7 @@ UniValue offeracceptlist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -3383,11 +3392,11 @@ UniValue offeracceptlist(const UniValue& params, bool fHelp) {
 	map< vector<unsigned char>, int > vNamesI;
 	map< vector<unsigned char>, int > vNamesA;
 	vector<COffer> offerScan;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		for(unsigned int identityIndex =0;identityIndex<identityes.size();identityIndex++)
+		for(unsigned int identityIndex =0;identityIndex<identities.size();identityIndex++)
 		{
-			string name = identityes[identityIndex];
+			string name = identities[identityIndex];
 			vector<unsigned char> vchIdentity = vchFromString(name);
 			vector<CIdentityIndex> vtxPos;
 			if (!pidentitydb->ReadIdentity(vchIdentity, vtxPos) || vtxPos.empty())
@@ -3645,20 +3654,20 @@ bool BuildOfferAcceptJson(const COffer& theOffer, const CIdentityIndex& theIdent
 UniValue offerlist(const UniValue& params, bool fHelp) {
     if (fHelp || 3 < params.size())
         throw runtime_error("offerlist [\"identity\",...] [<offer>] [<privatekey>]\n"
-                "list offers that an array of identityes own. Set of identityes to look up based on identity, and private key to decrypt any data found in offer.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list offers that an array of identities own. Set of identities to look up based on identity, and private key to decrypt any data found in offer.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -3666,7 +3675,7 @@ UniValue offerlist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -3681,11 +3690,11 @@ UniValue offerlist(const UniValue& params, bool fHelp) {
 	vector<COffer> offerScan;
 	map< vector<unsigned char>, int > vNamesI;
 	map< vector<unsigned char>, UniValue > vNamesO;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		for(unsigned int identityIndex =0;identityIndex<identityes.size();identityIndex++)
+		for(unsigned int identityIndex =0;identityIndex<identities.size();identityIndex++)
 		{
-			string name = identityes[identityIndex];
+			string name = identities[identityIndex];
 			vector<unsigned char> vchIdentity = vchFromString(name);
 
 
@@ -3857,16 +3866,16 @@ std::string GetPaymentOptionsString(const uint32_t paymentOptions)
 	if(IsPaymentOptionInMask(paymentOptions, PAYMENTOPTION_BTC)) {
 		currencies.push_back(std::string("BTC"));
 	}
-	if(IsPaymentOptionInMask(paymentOptions, PAYMENTOPTION_ZEC)) {
-		currencies.push_back(std::string("ZEC"));
+	if(IsPaymentOptionInMask(paymentOptions, PAYMENTOPTION_SEQ)) {
+		currencies.push_back(std::string("SEQ"));
 	}
 	return boost::algorithm::join(currencies, "+");
 }
 CChainParams::AddressType PaymentOptionToAddressType(const uint32_t paymentOption)
 {
 	CChainParams::AddressType myAddressType = CChainParams::ADDRESS_DYN;
-	if(paymentOption == PAYMENTOPTION_ZEC)
-		myAddressType = CChainParams::ADDRESS_ZEC;
+	if(paymentOption == PAYMENTOPTION_SEQ)
+		myAddressType = CChainParams::ADDRESS_SEQ;
 	return myAddressType;
 }
 

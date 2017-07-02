@@ -43,10 +43,14 @@ enum opcodetype
 {
     // push value
     OP_0 = 0x00,
-    // SYSCOIN aliases
-    OP_ALIAS_PAYMENT = 0x01,
-    OP_ALIAS_ACTIVATE=0x02,
-    OP_ALIAS_UPDATE=0x03,
+    
+    // identity alias system
+	OP_IDENTITY_NEW = 0xd1,
+	OP_IDENTITY_DELETE = 0xd2,
+    OP_IDENTITY_PAYMENT = 0xd3,
+    OP_IDENTITY_ACTIVATE=0xd4,
+    OP_IDENTITY_UPDATE=0xd5,
+	OP_IDENTITY_MULTISIG = 0xd6,
 
     // distributed exchange
     OP_OFFER_ACTIVATE=0x04,
@@ -213,11 +217,6 @@ enum opcodetype
 };
 
 const char* GetOpName(opcodetype opcode);
-
-static const int OP_NAME_NEW = 0x01;
-static const int OP_NAME_UPDATE = 0x02;
-static const int OP_NAME_DELETE = 0x03;
-static const int OP_NAME_MULTISIG = 0x04;
 
 class scriptnum_error : public std::runtime_error
 {

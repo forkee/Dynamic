@@ -1,7 +1,10 @@
-// Copyright (c) 2014 Dynamic Developers
-// Distributed under the MIT/X11 software license, see the accompanying
-// file license.txt or http://www.opensource.org/licenses/mit-license.php.
-//
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Copyright (c) 2013-2017 Emercoin Developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "identity.h"
 #include "offer.h"
 #include "escrow.h"
@@ -22,6 +25,7 @@
 #include "policy/policy.h"
 #include "utiltime.h"
 #include "coincontrol.h"
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/xpressive/xpressive_dynamic.hpp>
@@ -30,14 +34,18 @@
 #include <boost/thread.hpp>
 #include <boost/algorithm/hex.hpp>
 #include <boost/algorithm/string/find.hpp>
+
 using namespace std;
+
 CIdentityDB *pidentitydb = NULL;
 COfferDB *pofferdb = NULL;
 CCertDB *pcertdb = NULL;
 CEscrowDB *pescrowdb = NULL;
 CMessageDB *pmessagedb = NULL;
+
 extern CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys);
 extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0);
+
 bool GetDynamicTransaction(int nHeight, const uint256 &hash, CTransaction &txOut, const Consensus::Params& consensusParams)
 {
 	if(nHeight < 0 || nHeight > chainActive.Height())
@@ -58,6 +66,7 @@ bool GetDynamicTransaction(int nHeight, const uint256 &hash, CTransaction &txOut
     }
 	return false;
 }
+
 bool GetTimeToPrune(const CScript& scriptPubKey, uint64_t &nTime)
 {
 	vector<unsigned char> vchData;
@@ -414,7 +423,7 @@ bool getBanListFromValue(map<string, unsigned char>& banIdentityList,  map<strin
 			
 		
 
-		UniValue objIdentityValue = find_value(outerObj, "identityes");
+		UniValue objIdentityValue = find_value(outerObj, "identities");
 		if (objIdentityValue.isArray())
 		{
 			UniValue codes = objIdentityValue.get_array();
@@ -856,7 +865,7 @@ bool CheckIdentityInputs(const CTransaction &tx, int op, int nOut, const vector<
 					fYears = 1;
 				fee *= powf(2.88,fYears);
 
-				// ensure identityes are good for atleast an hour
+				// ensure identities are good for atleast an hour
 				if(nTimeExpiry < 3600)
 					theIdentity.nExpireTime = chainActive[nHeightTmp]->nTime+3600;
 			}
@@ -963,7 +972,7 @@ bool CheckIdentityInputs(const CTransaction &tx, int op, int nOut, const vector<
 						GetAddress(theIdentity, &myAddress);
 						const vector<unsigned char> &vchAddress = vchFromString(myAddress.ToString());
 						// make sure xfer to pubkey doesn't point to an identity already, otherwise don't assign pubkey to identity
-						// we want to avoid identityes with duplicate public keys (addresses)
+						// we want to avoid identities with duplicate public keys (addresses)
 						if (pidentitydb->ExistsAddress(vchAddress))
 						{
 							vector<unsigned char> vchMyIdentity;
@@ -1759,8 +1768,8 @@ UniValue identitynew(const UniValue& params, bool fHelp) {
 						"<safe search> set to No if this identity should only show in the search when safe search is not selected. Defaults to Yes (identity shows with or without safe search selected in search lists).\n"	
 						"<accept transfers> set to No if this identity should not allow a certificate to be transferred to it. Defaults to Yes.\n"	
 						"<expire> String. Time in seconds. Future time when to expire identity. It is exponentially more expensive per year, calculation is FEERATE*(1.5^years). FEERATE is the dynamic satoshi per byte fee set in the rate peg identity used for this identity. Defaults to 1 year.\n"	
-						"<nrequired> For multisig identityes only. The number of required signatures out of the n identityes for a multisig identity update.\n"
-						"<identityes>     For multisig identityes only. A json array of identityes which are used to sign on an update to this identity.\n"
+						"<nrequired> For multisig identities only. The number of required signatures out of the n identities for a multisig identity update.\n"
+						"<identities>     For multisig identities only. A json array of identities which are used to sign on an update to this identity.\n"
 						"     [\n"
 						"       \"identity\"    Existing dynamic identity name\n"
 						"       ,...\n"
@@ -2041,8 +2050,8 @@ UniValue identityupdate(const UniValue& params, bool fHelp) {
 						"<toidentity_pubkey> receiver dynamic identity pub key, if transferring identity.\n"
 						"<accept transfers> set to No if this identity should not allow a certificate to be transferred to it. Defaults to Yes.\n"		
 						"<expire> String. Time in seconds. Future time when to expire identity. It is exponentially more expensive per year, calculation is 1.5^years. FEERATE is the dynamic satoshi per byte fee set in the rate peg identity used for this identity. Defaults to 1 year.\n"		
-						"<nrequired> For multisig identityes only. The number of required signatures out of the n identityes for a multisig identity update.\n"
-						"<identityes>     For multisig identityes only. A json array of identityes which are used to sign on an update to this identity.\n"
+						"<nrequired> For multisig identities only. The number of required signatures out of the n identities for a multisig identity update.\n"
+						"<identities>     For multisig identities only. A json array of identities which are used to sign on an update to this identity.\n"
 						"     [\n"
 						"       \"identity\"    Existing dynamic identity name\n"
 						"       ,...\n"
@@ -2544,7 +2553,7 @@ bool IsMyIdentity(const CIdentityIndex& identity)
 UniValue identitylist(const UniValue& params, bool fHelp) {
 	if (fHelp || 2 < params.size())
 		throw runtime_error("identitylist [<identityname>] [<privatekey>]\n"
-				"list my own identityes.\n"
+				"list my own identities.\n"
 				"<identityname> identity name to use as filter.\n");
 
 	vector<unsigned char> vchIdentity;
@@ -3029,13 +3038,13 @@ UniValue identityfilter(const UniValue& params, bool fHelp) {
 	if (fHelp || params.size() > 3)
 		throw runtime_error(
 				"identityfilter [[[[[regexp]] from='']] safesearch='Yes']\n"
-						"scan and filter identityes\n"
-						"[regexp] : apply [regexp] on identityes, empty means all identityes\n"
+						"scan and filter identities\n"
+						"[regexp] : apply [regexp] on identities, empty means all identities\n"
 						"[from] : show results from this GUID [from], empty means first.\n"
-						"[identityfilter] : shows all identityes that are safe to display (not on the ban list)\n"
-						"identityfilter \"\" 5 # list identityes updated in last 5 blocks\n"
-						"identityfilter \"^identity\" # list all identityes starting with \"identity\"\n"
-						"identityfilter 36000 0 0 stat # display stats (number of identityes) on active identityes\n");
+						"[identityfilter] : shows all identities that are safe to display (not on the ban list)\n"
+						"identityfilter \"\" 5 # list identities updated in last 5 blocks\n"
+						"identityfilter \"^identity\" # list all identities starting with \"identity\"\n"
+						"identityfilter 36000 0 0 stat # display stats (number of identities) on active identities\n");
 
 	vector<unsigned char> vchIdentity;
 	string strRegexp;
@@ -3100,7 +3109,7 @@ UniValue identitypay(const UniValue& params, bool fHelp) {
             + HelpRequiringPassphrase() + "\n"
             "\nArguments:\n"
 			"1. \"identity\"				(string, required) identity to pay from\n"
-            "2. \"amounts\"             (string, required) A json object with identityes and amounts\n"
+            "2. \"amounts\"             (string, required) A json object with identities and amounts\n"
             "    {\n"
             "      \"address\":amount   (numeric or string) The dynamic identity is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value\n"
             "      ,...\n"
@@ -3111,7 +3120,7 @@ UniValue identitypay(const UniValue& params, bool fHelp) {
             "\"transactionid\"          (string) The transaction id for the send. Only 1 transaction is created regardless of \n"
             "                                    the number of addresses.\n"
             "\nExamples:\n"
-            "\nSend two amounts to two different addresses\identityes:\n"
+            "\nSend two amounts to two different addresses\identities:\n"
             + HelpExampleCli("identitypay", "\"myidentity\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\":0.01,\\\"identity2\\\":0.02}\"") +
             "\nSend two amounts to two different addresses setting the comment:\n"
             + HelpExampleCli("identitypay", "\"myidentity\" \"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\":0.01,\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\" \"testing\"")

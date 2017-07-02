@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "escrow.h"
 #include "offer.h"
 #include "identity.h"
@@ -13,6 +19,7 @@
 #include "policy/policy.h"
 #include "script/script.h"
 #include "chainparams.h"
+
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/xpressive/xpressive_dynamic.hpp>
 #include <boost/lexical_cast.hpp>
@@ -20,11 +27,12 @@
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+
 extern CScript _createmultisig_redeemScript(const UniValue& params);
 using namespace std;
 extern CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys);
-extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0)
-;
+extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0);
+
 void PutToEscrowList(std::vector<CEscrow> &escrowList, CEscrow& index) {
 	int i = escrowList.size() - 1;
 	BOOST_REVERSE_FOREACH(CEscrow &o, escrowList) {
@@ -701,7 +709,7 @@ bool CheckEscrowInputs(const CTransaction &tx, int op, int nOut, const vector<ve
 				serializedEscrow.vchArbiterIdentity != theEscrow.vchArbiterIdentity ||
 				serializedEscrow.vchSellerIdentity != theEscrow.vchSellerIdentity)
 			{
-				errorMessage = "DYNAMIC_ESCROW_CONSENSUS_ERROR: ERRCODE: 4038 - " + _("Invalid identityes used for escrow transaction");
+				errorMessage = "DYNAMIC_ESCROW_CONSENSUS_ERROR: ERRCODE: 4038 - " + _("Invalid identities used for escrow transaction");
 				return true;
 			}
 			if(serializedEscrow.bPaymentAck && theEscrow.bPaymentAck)
@@ -3685,20 +3693,20 @@ bool BuildEscrowJson(const CEscrow &escrow, const CEscrow &firstEscrow, UniValue
 UniValue escrowlist(const UniValue& params, bool fHelp) {
    if (fHelp || 3 < params.size())
         throw runtime_error("escrowlist [\"identity\",...] [<escrow>] [<privatekey>]\n"
-                "list escrows that an array of identityes are involved in. Set of identityes to look up based on identity, and private key to decrypt any data found in escrow.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list escrows that an array of identities are involved in. Set of identities to look up based on identity, and private key to decrypt any data found in escrow.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -3706,7 +3714,7 @@ UniValue escrowlist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -3720,9 +3728,9 @@ UniValue escrowlist(const UniValue& params, bool fHelp) {
 	UniValue oRes(UniValue::VARR);
 	map< vector<unsigned char>, int > vNamesI;
 	vector<pair<CEscrow, CEscrow> > escrowScan;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		if (!pescrowdb->ScanEscrows(vchNameUniq, "", identityes, 1000, escrowScan))
+		if (!pescrowdb->ScanEscrows(vchNameUniq, "", identities, 1000, escrowScan))
 			throw runtime_error("DYNAMIC_ESCROW_RPC_ERROR: ERRCODE: 4606 - " + _("Scan failed"));
 	
 	}
@@ -3779,8 +3787,8 @@ UniValue escrowfilter(const UniValue& params, bool fHelp) {
 	UniValue oRes(UniValue::VARR);
 
 	vector<pair<CEscrow, CEscrow> > escrowScan;
-	vector<string> identityes;
-	if (!pescrowdb->ScanEscrows(vchEscrow, strRegexp, identityes, 1000, escrowScan))
+	vector<string> identities;
+	if (!pescrowdb->ScanEscrows(vchEscrow, strRegexp, identities, 1000, escrowScan))
 		throw runtime_error("DYNAMIC_ESCROW_RPC_ERROR: ERRCODE: 4607 - " + _("Scan failed"));
 
 	pair<CEscrow, CEscrow> pairScan;

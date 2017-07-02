@@ -1,7 +1,15 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef __MESSAGECRYPTER_H__
 #define __MESSAGECRYPTER_H__
+
 #include <string.h>
 #include <string>
+
 #include <vector>
 using std::string;
 #include <cryptopp/files.h>
@@ -48,6 +56,7 @@ namespace ASN1 = CryptoPP::ASN1;
 using CryptoPP::PK_Encryptor;
 using CryptoPP::PK_Decryptor;
 using CryptoPP::g_nullNameValuePairs;
+
 class CMessageCrypter
 {
 
@@ -66,4 +75,5 @@ public:
 
     }
 };
+
 #endif

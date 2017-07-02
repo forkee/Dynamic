@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "cert.h"
 #include "identity.h"
 #include "offer.h"
@@ -11,6 +17,7 @@
 #include "wallet/wallet.h"
 #include "chainparams.h"
 #include "messagecrypter.h"
+
 #include <boost/algorithm/hex.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/xpressive/xpressive_dynamic.hpp>
@@ -18,9 +25,11 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+
 using namespace std;
-extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0)
-;
+
+extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0);
+
 bool EncryptMessage(const vector<unsigned char> &vchPubKey, const vector<unsigned char> &vchMessage, string &strCipherText)
 {
 	strCipherText.clear();
@@ -1244,20 +1253,20 @@ UniValue certinfo(const UniValue& params, bool fHelp) {
 UniValue certlist(const UniValue& params, bool fHelp) {
     if (fHelp || 3 < params.size())
         throw runtime_error("certlist [\"identity\",...] [<cert>] [<privatekey>]\n"
-                "list certificates that an array of identityes own. Set of identityes to look up based on identity, and private key to decrypt any data found in certificates.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list certificates that an array of identities own. Set of identities to look up based on identity, and private key to decrypt any data found in certificates.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -1265,7 +1274,7 @@ UniValue certlist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -1280,9 +1289,9 @@ UniValue certlist(const UniValue& params, bool fHelp) {
 	UniValue oRes(UniValue::VARR);
 	map< vector<unsigned char>, int > vNamesI;
 	vector<CCert> certScan;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		if (!pcertdb->ScanCerts(vchNameUniq, "", identityes, true, "", 1000,certScan))
+		if (!pcertdb->ScanCerts(vchNameUniq, "", identities, true, "", 1000,certScan))
 			throw runtime_error("DYNAMIC_CERTIFICATE_RPC_ERROR: ERRCODE: 2517 - " + _("Scan failed"));
 	}
 	CTransaction identitytx;
@@ -1430,8 +1439,8 @@ UniValue certfilter(const UniValue& params, bool fHelp) {
     UniValue oRes(UniValue::VARR);
     
     vector<CCert> certScan;
-	vector<string> identityes;
-    if (!pcertdb->ScanCerts(vchCert, strRegexp, identityes, safeSearch, strCategory, 25, certScan))
+	vector<string> identities;
+    if (!pcertdb->ScanCerts(vchCert, strRegexp, identities, safeSearch, strCategory, 25, certScan))
 		throw runtime_error("DYNAMIC_CERTIFICATE_RPC_ERROR: ERRCODE: 2520 - " + _("Scan failed"));
   
 	CTransaction identitytx;

@@ -46,12 +46,12 @@ class CChainParams
 public:
     enum Base58Type {
         PUBKEY_ADDRESS,
-        PUBKEY_ADDRESS_SYS,
-        PUBKEY_ADDRESS_ZEC,
+        PUBKEY_ADDRESS_DYN,
+        PUBKEY_ADDRESS_SEQ,
         SCRIPT_ADDRESS,
-        SCRIPT_ADDRESS_ZEC,
+        SCRIPT_ADDRESS_SEQ,
         SECRET_KEY,
-        SECRET_KEY_SYS,
+        SECRET_KEY_DYN,
         EXT_PUBLIC_KEY,
         EXT_SECRET_KEY,
 
@@ -60,8 +60,8 @@ public:
     
     enum AddressType {
 		ADDRESS_OLDSYS,
-        ADDRESS_SYS,
-        ADDRESS_ZEC,
+        ADDRESS_DYN,
+        ADDRESS_SEQ,
         MAX_ADDRESS_TYPES
     };
     

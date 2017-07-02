@@ -17,7 +17,7 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
-#include "dns/dyndns.h"
+//#include "syscoin/dyndns.h"
 #include "dynode-payments.h"
 #include "dynode-sync.h"
 #include "dynodeconfig.h"
@@ -25,7 +25,6 @@
 #include "flat-database.h"
 #include "governance.h"
 #include "instantsend.h"
-#include "dns/hooks.h"
 #include "httpserver.h"
 #include "httprpc.h"
 #include "key.h"
@@ -58,6 +57,11 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+#include "syscoin/identity.h"
+#include "syscoin/offer.h"
+#include "syscoin/cert.h"
+#include "syscoin/escrow.h"
+#include "syscoin/message.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -90,7 +94,7 @@ CWallet* pwalletMain = NULL;
 bool fFeeEstimatesInitialized = false;
 bool fRestartRequested = false;  // true: restart false: shutdown
 
-DynDns* dyndns = NULL; //DDNS
+//DynDns* dyndns = NULL; //DDNS
 
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
@@ -202,8 +206,8 @@ void PrepareShutdown()
 {
     fRequestShutdown = true; // Needed when we shutdown the wallet
     fRestartRequested = true; // Needed when we restart the wallet
-    if (dyndns)
-        delete dyndns;
+   // if (dyndns)
+      //  delete dyndns;
 
     LogPrintf("%s: In progress...\n", __func__);
     static CCriticalSection cs_Shutdown;
@@ -1513,6 +1517,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 delete pcoinsdbview;
                 delete pcoinscatcher;
                 delete pblocktree;
+                delete pidentitydb;
+                delete pofferdb;
+                delete pcertdb;
+                delete pescrowdb;
+                delete pmessagedb;
+
+                pidentitydb = new CIdentityDB(nCoinCacheUsage*20, false, fReindex);
+                pofferdb = new COfferDB(nCoinCacheUsage*2, false, fReindex);
+                pcertdb = new CCertDB(nCoinCacheUsage*2, false, fReindex);
+                pescrowdb = new CEscrowDB(nCoinCacheUsage*2, false, fReindex);
+                pmessagedb = new CMessageDB(nCoinCacheUsage*2, false, fReindex);
 
                 pblocktree = new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex || fReindexChainState);
@@ -1617,13 +1632,13 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Dynamic: check in nameindex need to be created or recreated
     // we should have block index fully loaded by now
-    extern bool createNameIndexFile();
+/*    extern bool createNameIndexFile();
     if (!boost::filesystem::exists(GetDataDir() / "ddns.dat") && !createNameIndexFile())
     {
         LogPrintf("Fatal error: Failed to create nameindex (ddns.dat) file.\n");
         return false;
     }
-
+*/
     boost::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
     CAutoFile est_filein(fopen(est_path.string().c_str(), "rb"), SER_DISK, CLIENT_VERSION);
     // Allowed to fail as this file IS missing on first startup.
@@ -2044,7 +2059,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif
 
     // init dyndns. WARNING: this should be done after hooks initialization
-    if (GetBoolArg("-dyndns", false))
+/*    if (GetBoolArg("-dyndns", false))
     {
         #define DYNDNS_PORT 5335
         int port = GetArg("-dyndnsport", DYNDNS_PORT);
@@ -2061,7 +2076,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         suffix.c_str(), allowed.c_str(), localcf.c_str(), enums.c_str(), tf.c_str(), verbose);
         LogPrintf("dDNS server started\n");
     }
-
+*/
     threadGroup.create_thread(boost::bind(&ThreadSendAlert));
 
     return !fRequestShutdown;

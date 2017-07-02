@@ -24,7 +24,7 @@
 using namespace boost;
 
 static uint64_t nAccountingEntryNumber = 0;
-extern int GetSyscoinTxVersion();
+extern int GetDynamicTxVersion();
 
 //
 // CWalletDB
@@ -379,7 +379,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             if (!(CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
 			{
 				// SYSCOIN
- 				if(wtx.GetHash() != hash && wtx.nVersion == GetSyscoinTxVersion())
+ 				if(wtx.GetHash() != hash && wtx.nVersion == GetDynamicTxVersion())
  					return true;
  				strErr = "Error reading wallet database. CheckTransaction failed, validation state: " + FormatStateMessage(state);
                 return false;

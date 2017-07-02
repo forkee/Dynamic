@@ -1,3 +1,10 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Copyright (c) 2013-2017 Emercoin Developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef IDENTITY_H
 #define IDENTITY_H
 
@@ -19,7 +26,9 @@ class CCoins;
 class CBlock;
 class CDynamicAddress;
 class COutPoint;
+
 struct CRecipient;
+
 static const unsigned int MAX_GUID_LENGTH = 71;
 // static const unsigned int MAX_NAME_LENGTH = 256;
 // static const unsigned int MAX_VALUE_LENGTH = 1024;
@@ -278,7 +287,7 @@ public:
 
 class CIdentityDB : public CDBWrapper {
 public:
-    CIdentityDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "identityes", nCacheSize, fMemory, fWipe) {
+    CIdentityDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "identities", nCacheSize, fMemory, fWipe) {
     }
 	bool WriteIdentity(const std::vector<unsigned char>& name, const std::vector<CIdentityIndex>& vtxPos) {	
 		return Write(make_pair(std::string("namei"), name), vtxPos);

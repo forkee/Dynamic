@@ -14,7 +14,6 @@
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/consensus.h"
-#include "dns/dns.h"
 #include "dynode-payments.h"
 #include "dynode-sync.h"
 #include "dynodeman.h"
@@ -131,8 +130,6 @@ void EraseOrphansFor(NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
  */
 static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams);
 static void CheckBlockIndex(const Consensus::Params& consensusParams);
-
-CHooks* hooks = InitHook(); //this adds ddns hooks which allow splicing of code inside standard dynamic functions.
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -1403,7 +1400,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         // Added for DDNS
         // Don't accept it if it can't get into a block
         CAmount txMinFee = GetMinRelayFee(tx, nSize, true);
-        if ((fLimitFree && nFees < txMinFee) || (isNameTx && !hooks->IsNameFeeEnough(tx, nFees)))
+        if (fLimitFree && nFees < txMinFee)
             return state.DoS(0, error("AcceptToMemoryPool : not enough fees %s, %d < %d",
                                       hash.ToString(), nFees, txMinFee),
                              REJECT_INSUFFICIENTFEE, "insufficient fee");
@@ -2624,12 +2621,6 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
                 }
 
             }
-
-            // Dynamic: undo name transactions in reverse order
-            if (fWriteNames)
-                for (int i = block.vtx.size() - 1; i >= 0; i--)
-                    hooks->DisconnectInputs(block.vtx[i]);
-
         }
     }
 
@@ -3099,14 +3090,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Dynamic: collect valid name tx
     // NOTE: tx.UpdateCoins should not affect this loop, probably...
     std::vector<CAmount> vFees (block.vtx.size(), 0);
-    std::vector<nameTempProxy> vName;
-    if (fWriteNames)
-        for (unsigned int i=0; i<block.vtx.size(); i++)
-        {
-            const CTransaction &tx = block.vtx[i];
-            if (!tx.IsCoinBase())
-                hooks->CheckInputs(tx, pindex, vName, vPos[i].second, vFees[i]); // collect valid name tx to vName
-        }
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -3171,10 +3154,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
-
-    // Dynamic DDNS: add names to ddns.dat
-    if (fWriteNames)
-        hooks->ConnectBlock(pindex, vName);
 
     return true;
 }

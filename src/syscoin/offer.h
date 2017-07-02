@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef OFFER_H
 #define OFFER_H
 
@@ -26,9 +32,10 @@ int IndexOfOfferOutput(const CTransaction& tx);
 std::string offerFromOp(int op);
 void OfferTxToJSON(const int op, const std::vector<unsigned char> &vchData, const std::vector<unsigned char> &vchHash, UniValue &entry);
 bool RemoveOfferScriptPrefix(const CScript& scriptIn, CScript& scriptOut);
+
 #define PAYMENTOPTION_DYN 0x01
 #define PAYMENTOPTION_BTC 0x02
-#define PAYMENTOPTION_ZEC 0x04
+#define PAYMENTOPTION_SEQ 0x04
 
 bool ValidatePaymentOptionsMask(const uint32_t paymentOptionsMask);
 bool ValidatePaymentOptionsString(const std::string &paymentOptionsString);

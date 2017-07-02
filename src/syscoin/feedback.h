@@ -1,7 +1,15 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef FEEDBACK_H
 #define FEEDBACK_H
+
 #include "script/script.h"
 #include "serialize.h"
+
 enum FeedbackUser {
 	FEEDBACKNONE=0,
     FEEDBACKBUYER=1,

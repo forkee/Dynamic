@@ -17,20 +17,20 @@ class CScript;
 class CTransaction;
 class CTxOut;
 
-struct nameTempProxy;
+struct identityTempProxy;
 
 class CHooks
 {
 public:
-    virtual bool IsNameFeeEnough(const CTransaction& tx, const CAmount& txFee) = 0;
-    virtual bool CheckInputs(const CTransaction& tx, const CBlockIndex* pindexBlock, std::vector<nameTempProxy> &vName, const CDiskTxPos& pos, const CAmount& txFee) = 0;
+    virtual bool IsIdentityFeeEnough(const CTransaction& tx, const CAmount& txFee) = 0;
+    virtual bool CheckInputs(const CTransaction& tx, const CBlockIndex* pindexBlock, std::vector<identityTempProxy> &vIdentity, const CDiskTxPos& pos, const CAmount& txFee) = 0;
     virtual bool DisconnectInputs(const CTransaction& tx) = 0;
-    virtual bool ConnectBlock(CBlockIndex* pindex, const std::vector<nameTempProxy> &vName) = 0;
+    virtual bool ConnectBlock(CBlockIndex* pindex, const std::vector<identityTempProxy> &vIdentity) = 0;
     virtual bool ExtractAddress(const CScript& script, std::string& address) = 0;
-    virtual void AddToPendingNames(const CTransaction& tx) = 0;
-    virtual bool RemoveNameScriptPrefix(const CScript& scriptIn, CScript& scriptOut) = 0;
-    virtual bool IsNameScript(CScript scr) = 0;
-    virtual bool getNameValue(const std::string& sName, std::string& sValue) = 0;
+    virtual void AddToPendingIdentitys(const CTransaction& tx) = 0;
+    virtual bool RemoveIdentityScriptPrefix(const CScript& scriptIn, CScript& scriptOut) = 0;
+    virtual bool IsIdentityScript(CScript scr) = 0;
+    virtual bool getIdentityValue(const std::string& sIdentity, std::string& sValue) = 0;
     virtual bool DumpToTextFile() = 0;
 };
 

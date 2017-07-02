@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef CERT_H
 #define CERT_H
 
@@ -5,6 +11,7 @@
 #include "dbwrapper.h"
 #include "script/script.h"
 #include "serialize.h"
+
 class CWalletTx;
 class CTransaction;
 class CReserveKey;
@@ -12,6 +19,7 @@ class CCoinsViewCache;
 class CCoins;
 class CBlock;
 class CIdentityIndex;
+
 bool CheckCertInputs(const CTransaction &tx, int op, int nOut, const std::vector<std::vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, std::string &errorMessage, bool dontaddtodb=false);
 bool DecodeCertTx(const CTransaction& tx, int& op, int& nOut, std::vector<std::vector<unsigned char> >& vvch);
 bool DecodeAndParseCertTx(const CTransaction& tx, int& op, int& nOut, std::vector<std::vector<unsigned char> >& vvch);
@@ -25,6 +33,7 @@ bool DecryptMessage(const CIdentityIndex& identity, const std::vector<unsigned c
 void CertTxToJSON(const int op, const std::vector<unsigned char> &vchData, const std::vector<unsigned char> &vchHash, UniValue &entry);
 std::string certFromOp(int op);
 bool RemoveCertScriptPrefix(const CScript& scriptIn, CScript& scriptOut);
+
 class CCert {
 public:
 	std::vector<unsigned char> vchCert;

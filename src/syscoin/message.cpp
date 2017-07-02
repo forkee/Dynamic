@@ -1,3 +1,9 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "message.h"
 #include "identity.h"
 #include "cert.h"
@@ -16,9 +22,11 @@
 #include <boost/thread.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <functional> 
+
 using namespace std;
-extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0)
-;
+
+extern void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxInIdentity=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxInLinkIdentity=NULL,  int nTxOutLinkIdentity = 0);
+
 void PutToMessageList(std::vector<CMessage> &messageList, CMessage& index) {
 	int i = messageList.size() - 1;
 	BOOST_REVERSE_FOREACH(CMessage &o, messageList) {
@@ -695,20 +703,20 @@ UniValue messageinfo(const UniValue& params, bool fHelp) {
 UniValue messagereceivelist(const UniValue& params, bool fHelp) {
     if (fHelp || 3 < params.size())
         throw runtime_error("messagereceivelist [\"identity\",...] [<message>] [<privatekey>]\n"
-                "list received messages that an array of identityes own. Set of identityes to look up based on identity, and private key to decrypt any data found in message.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list received messages that an array of identities own. Set of identities to look up based on identity, and private key to decrypt any data found in message.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -716,7 +724,7 @@ UniValue messagereceivelist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -730,9 +738,9 @@ UniValue messagereceivelist(const UniValue& params, bool fHelp) {
 	UniValue oRes(UniValue::VARR);
 	map< vector<unsigned char>, int > vNamesI;
 	vector<CMessage > messageScan;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		if (!pmessagedb->ScanRecvMessages(vchNameUniq, identityes, 1000, messageScan))
+		if (!pmessagedb->ScanRecvMessages(vchNameUniq, identities, 1000, messageScan))
 			throw runtime_error("DYNAMIC_MESSAGE_RPC_ERROR: ERRCODE: 3508 - " + _("Scan failed"));
 	}
 	else
@@ -822,20 +830,20 @@ bool BuildMessageJson(const CMessage& message, UniValue& oName, const string &st
 UniValue messagesentlist(const UniValue& params, bool fHelp) {
     if (fHelp || 3 < params.size())
         throw runtime_error("messagesentlist [\"identity\",...] [<message>] [<privatekey>]\n"
-                "list sent messages that an array of identityes own. Set of identityes to look up based on identity, and private key to decrypt any data found in message.");
-	UniValue identityesValue(UniValue::VARR);
-	vector<string> identityes;
+                "list sent messages that an array of identities own. Set of identities to look up based on identity, and private key to decrypt any data found in message.");
+	UniValue identitiesValue(UniValue::VARR);
+	vector<string> identities;
 	if(params.size() >= 1)
 	{
 		if(params[0].isArray())
 		{
-			identityesValue = params[0].get_array();
-			for(unsigned int identityIndex =0;identityIndex<identityesValue.size();identityIndex++)
+			identitiesValue = params[0].get_array();
+			for(unsigned int identityIndex =0;identityIndex<identitiesValue.size();identityIndex++)
 			{
-				string lowerStr = identityesValue[identityIndex].get_str();
+				string lowerStr = identitiesValue[identityIndex].get_str();
 				boost::algorithm::to_lower(lowerStr);
 				if(!lowerStr.empty())
-					identityes.push_back(lowerStr);
+					identities.push_back(lowerStr);
 			}
 		}
 		else
@@ -843,7 +851,7 @@ UniValue messagesentlist(const UniValue& params, bool fHelp) {
 			string identityName =  params[0].get_str();
 			boost::algorithm::to_lower(identityName);
 			if(!identityName.empty())
-				identityes.push_back(identityName);
+				identities.push_back(identityName);
 		}
 	}
 	vector<unsigned char> vchNameUniq;
@@ -857,11 +865,11 @@ UniValue messagesentlist(const UniValue& params, bool fHelp) {
 	UniValue oRes(UniValue::VARR);
 	map< vector<unsigned char>, int > vNamesI;
 	vector<CMessage> messageScan;
-	if(identityes.size() > 0)
+	if(identities.size() > 0)
 	{
-		for(unsigned int identityIndex =0;identityIndex<identityes.size();identityIndex++)
+		for(unsigned int identityIndex =0;identityIndex<identities.size();identityIndex++)
 		{
-			string name = identityes[identityIndex];
+			string name = identities[identityIndex];
 			vector<unsigned char> vchIdentity = vchFromString(name);
 			vector<CIdentityIndex> vtxPos;
 			if (!pidentitydb->ReadIdentity(vchIdentity, vtxPos) || vtxPos.empty())

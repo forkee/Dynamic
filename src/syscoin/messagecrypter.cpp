@@ -1,4 +1,11 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "messagecrypter.h"
+
 bool CMessageCrypter::Encrypt(const string& vchPubKey, const string& vchPlaintext, string& vchCiphertext)
 {
     try

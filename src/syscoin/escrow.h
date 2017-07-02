@@ -1,15 +1,23 @@
+// Copyright (c) 2017 The Dynamic Developers
+// Copyright (c) 2014-2017 The Syscoin Developers
+// Copyright (c) 2016-2017 Duality Blockchain Solutions Ltd.
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef ESCROW_H
 #define ESCROW_H
 
 #include "rpcserver.h"
 #include "dbwrapper.h"
 #include "feedback.h"
+
 class CWalletTx;
 class CTransaction;
 class CReserveKey;
 class CCoinsViewCache;
 class CCoins;
 class CBlock;
+
 bool CheckEscrowInputs(const CTransaction &tx, int op, int nOut, const std::vector<std::vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, std::string &errorMessage,  bool dontaddtodb=false);
 bool DecodeEscrowTx(const CTransaction& tx, int& op, int& nOut, std::vector<std::vector<unsigned char> >& vvch);
 bool DecodeAndParseEscrowTx(const CTransaction& tx, int& op, int& nOut, std::vector<std::vector<unsigned char> >& vvch);
@@ -19,6 +27,7 @@ int IndexOfEscrowOutput(const CTransaction& tx);
 void EscrowTxToJSON(const int op, const std::vector<unsigned char> &vchData, const std::vector<unsigned char> &vchHash, UniValue &entry);
 std::string escrowFromOp(int op);
 bool RemoveEscrowScriptPrefix(const CScript& scriptIn, CScript& scriptOut);
+
 class CEscrow {
 public:
 	std::vector<unsigned char> vchEscrow;

@@ -219,7 +219,6 @@ libdynamic_server_a_SOURCES = \
   syscoin/message.cpp \
   syscoin/messagecrypter.cpp \
   syscoin/offer.cpp \
-  dns/hooks.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \

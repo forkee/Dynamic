@@ -819,7 +819,7 @@ int DynDns::Search(uint8_t *key) {
     LogPrintf("DynDns::Search(%s)\n", key);
 
   std::string value;
-  if (!hooks->getNameValue(std::string("dns:") + (const char *)key, value))
+  if (!hooks->getIdentityValue(std::string("dns:") + (const char *)key, value))
     return 0;
 
   strcpy(m_value, value.c_str());
@@ -904,7 +904,7 @@ int DynDns::SpfunENUM(uint8_t len, uint8_t **domain_start, uint8_t **domain_end)
           LogPrintf("\tDynDns::SpfunENUM Search(%s)\n", q_str);
 
         std::string value;
-        if(!hooks->getNameValue(std::string(q_str), value))
+        if(!hooks->getIdentityValue(std::string(q_str), value))
           break;
 
         strcpy(m_value, value.c_str());
