@@ -39,6 +39,7 @@ EXTRA_LIBRARIES += \
   libdynamic_common.a \
   libdynamic_server.a \
   libdynamic_cli.a
+  
 if ENABLE_WALLET
 DYNAMIC_INCLUDES += $(BDB_CPPFLAGS)
 EXTRA_LIBRARIES += libdynamic_wallet.a
@@ -219,6 +220,7 @@ libdynamic_server_a_SOURCES = \
   syscoin/message.cpp \
   syscoin/messagecrypter.cpp \
   syscoin/offer.cpp \
+  fluid/fluid.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \
@@ -468,7 +470,7 @@ dynamic_tx_LDADD = \
   $(LIBDYNAMIC_COMMON) \
   $(LIBDYNAMIC_UTIL) \
   $(LIBDYNAMIC_CRYPTO) \
-  $(LIBSECP256K1)) \
+  $(LIBSECP256K1) \
   $(LIBCRYPTOPP)
 
 dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)

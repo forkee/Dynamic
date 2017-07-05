@@ -15,7 +15,6 @@
 #include "walletmodel.h"
 
 #include "base58.h"
-#include "dns/dns.h"
 #include "main.h"
 #include "ui_interface.h"
 #include "wallet/wallet.h"
@@ -243,7 +242,7 @@ void DNSPage::on_submitNameButton_clicked()
 {
     if (!walletModel)
         return;
-
+/*
     QString qsName = ui->registerName->text();
     qsName = qsName.toLower();  // make sure the DDNS entry is all lowercase.
     CNameVal value;             // byte-by-byte value, as is
@@ -381,7 +380,7 @@ void DNSPage::on_submitNameButton_clicked()
     }
 
     QMessageBox::warning(this, tr("Name registration failed"), err_msg);
-}
+*/}
 
 bool DNSPage::eventFilter(QObject *object, QEvent *event)
 {
@@ -459,7 +458,7 @@ void DNSPage::onSaveValueAsBinaryAction()
 {
     if(!ui->tableView || !ui->tableView->selectionModel())
         return;
-
+/*
 // get name and value
     QModelIndexList selection;
     selection = ui->tableView->selectionModel()->selectedRows(NameTableModel::Name);
@@ -488,6 +487,7 @@ void DNSPage::onSaveValueAsBinaryAction()
     BOOST_FOREACH(const unsigned char& uch, value)
         in << uch;
     file.close();
+*/
 }
 
 void DNSPage::exportClicked()

@@ -47,6 +47,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_ENDIF                  : return "OP_ENDIF";
     case OP_VERIFY                 : return "OP_VERIFY";
     case OP_RETURN                 : return "OP_RETURN";
+	case OP_MINT				   : return "OP_MINT";
 
     // stack ops
     case OP_TOALTSTACK             : return "OP_TOALTSTACK";

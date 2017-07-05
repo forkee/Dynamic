@@ -11,7 +11,7 @@
 #include "guiutil.h"
 #include "walletmodel.h"
 
-#include "dns/dns.h"
+//#include "dns/dns.h"
 #include "wallet/wallet.h"
 
 #include <vector>
@@ -53,7 +53,7 @@ public:
 
     void refreshNameTable(bool fMyNames, bool fOtherNames, bool fExpired)
     {
-        parent->beginResetModel();
+/*        parent->beginResetModel();
         cachedNameTable.clear();
 
         CNameVal nameUniq;
@@ -102,15 +102,15 @@ public:
         // qLowerBound() and qUpperBound() require our cachedNameTable list to be sorted in asc order
         qSort(cachedNameTable.begin(), cachedNameTable.end(), NameTableEntryLessThan());
         parent->endResetModel();
-    }
+  */  }
 
     void updateEntry(const NameTableEntry &nameObj, int status, int *outNewRowIndex = NULL)
     {
-        updateEntry(nameObj.name, nameObj.value, nameObj.address, nameObj.nExpiresAt, status, outNewRowIndex);
+    //    updateEntry(nameObj.name, nameObj.value, nameObj.address, nameObj.nExpiresAt, status, outNewRowIndex);
     }
 
     void updateEntry(const QString &name, const QString &value, const QString &address, int nExpiresAt, int status, int *outNewRowIndex = NULL)
-    {
+    { /*
         // Find name in model
         QList<NameTableEntry>::iterator lower = qLowerBound(
             cachedNameTable.begin(), cachedNameTable.end(), name, NameTableEntryLessThan());
@@ -164,7 +164,7 @@ public:
             parent->endRemoveRows();
             break;
         }
-    }
+    */}
 
     int size()
     {
@@ -227,7 +227,7 @@ QVariant NameTableModel::data(const QModelIndex &index, int role) const
         return QVariant();
 
     NameTableEntry *rec = static_cast<NameTableEntry*>(index.internalPointer());
-
+/*
     switch (role)
     {
     case Qt::DisplayRole:
@@ -271,7 +271,7 @@ QVariant NameTableModel::data(const QModelIndex &index, int role) const
             return QVariant(QColor(255,70,70));
         break;
     }
-
+*/
     return QVariant();
 }
 

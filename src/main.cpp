@@ -1035,6 +1035,7 @@ int GetISConfirmations(const uint256 &nTXHash)
     return 0;
 }
 
+extern bool VerifyInstruction(std::string uniqueIdentifier);
 
 bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
@@ -1058,6 +1059,10 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
+		if (txout.scriptPubKey.IsMintInstruction()) {
+			if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
+		}
     }
 
     // Check for duplicate inputs

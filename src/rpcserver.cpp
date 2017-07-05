@@ -345,6 +345,7 @@ static const CRPCCommand vRPCCommands[] =
 
     /* Dynamic features */
     { "Dynamic",                "dynode",                 &dynode,                 true  },
+    { "Dynamic",                "generatefluidissuetoken",&generatefluidissuetoken,true  },
     { "Dynamic",                "dynodelist",             &dynodelist,             true  },
     { "Dynamic",                "dynodebroadcast",        &dynodebroadcast,        true  },
     { "Dynamic",                "gobject",                &gobject,                true  },

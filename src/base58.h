@@ -105,7 +105,7 @@ public:
  */
 class CDynamicAddress : public CBase58Data {
 public:
-	// DYNAMIC
+	// DYNCOIN
 	bool isIdentity;
 	unsigned char safetyLevel;
 	bool safeSearch;
@@ -113,15 +113,15 @@ public:
 	std::vector<unsigned char> vchRedeemScript;
 	std::vector<unsigned char> vchPubKey;
 
-    bool Set(const CKeyID &id, CChainParams::AddressType sysVer = CChainParams::ADDRESS_DYN);
-    bool Set(const CScriptID &id, CChainParams::AddressType sysVer = CChainParams::ADDRESS_DYN);
-    bool Set(const CTxDestination &dest, CChainParams::AddressType sysVer = CChainParams::ADDRESS_DYN);
+    bool Set(const CKeyID &id, CChainParams::AddressType idVer = CChainParams::ADDRESS_DYN);
+    bool Set(const CScriptID &id, CChainParams::AddressType idVer = CChainParams::ADDRESS_DYN);
+    bool Set(const CTxDestination &dest, CChainParams::AddressType idVer = CChainParams::ADDRESS_DYN);
     bool IsValid() const;
     bool IsValid(const CChainParams &params) const;
 
-	// DYNAMIC identityes as addresses
+	// DYNCOIN identities as addresses
     CDynamicAddress();
-	CDynamicAddress(const CTxDestination &dest, CChainParams::AddressType sysVer = CChainParams::ADDRESS_DYN);
+	CDynamicAddress(const CTxDestination &dest, CChainParams::AddressType idVer = CChainParams::ADDRESS_DYN);
     CDynamicAddress(const std::string& strAddress);
     CDynamicAddress(const char* pszAddress);
 

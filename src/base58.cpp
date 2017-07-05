@@ -233,7 +233,7 @@ public:
 };
 } // anon namespace
 
-// DYNAMIC identityes as addresses
+// DYNCOIN identities as addresses
 CDynamicAddress::CDynamicAddress() {
 	isIdentity = false;
 	identityName = "";
@@ -242,15 +242,15 @@ CDynamicAddress::CDynamicAddress() {
 	vchRedeemScript.clear();
 	vchPubKey.clear();
 }
-// DYNAMIC support old sys
-CDynamicAddress::CDynamicAddress(const CTxDestination &dest, CChainParams::AddressType sysVer) { 
+// DYNCOIN support old sys
+CDynamicAddress::CDynamicAddress(const CTxDestination &dest, CChainParams::AddressType idVer) { 
 	isIdentity = false;
 	safeSearch = false;
 	safetyLevel = 0;
 	identityName = "";
 	vchRedeemScript.clear();
 	vchPubKey.clear();
-    Set(dest, sysVer);
+    Set(dest, idVer);
 }
 CDynamicAddress::CDynamicAddress(const std::string& strAddress) { 
 	isIdentity = false;
@@ -309,28 +309,30 @@ CDynamicAddress::CDynamicAddress(const char* pszAddress) {
 		}	
 	}
 }
-// DYNAMIC support old sys
-bool CDynamicAddress::Set(const CKeyID& id, CChainParams::AddressType sysVer)
+// DYNCOIN support old sys
+bool CDynamicAddress::Set(const CKeyID& id, CChainParams::AddressType idVer)
 {   
-	if(sysVer == CChainParams::ADDRESS_DYN)
+    /* if(idVer == CChainParams::ADDRESS_OLDDYN)
+        SetData(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS_DYN), &id, 20);
+    else */ if(idVer == CChainParams::ADDRESS_DYN)
         SetData(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS), &id, 20);
-    else if(sysVer == CChainParams::ADDRESS_DYN)
+    else if(idVer == CChainParams::ADDRESS_SEQ)
         SetData(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS_SEQ), &id, 20);
     return true;
 }
 
-bool CDynamicAddress::Set(const CScriptID& id, CChainParams::AddressType sysVer)
+bool CDynamicAddress::Set(const CScriptID& id, CChainParams::AddressType idVer)
 {
-    if(sysVer == CChainParams::ADDRESS_DYN)
+    if(idVer == CChainParams::ADDRESS_DYN /* || idVer == CChainParams::ADDRESS_OLDDYN */)
         SetData(Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS), &id, 20);
-    else if(sysVer == CChainParams::ADDRESS_DYN)
+    else if(idVer == CChainParams::ADDRESS_SEQ)
         SetData(Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS_SEQ), &id, 20);
     return true;
 }
-// DYNAMIC support old sys
-bool CDynamicAddress::Set(const CTxDestination& dest, CChainParams::AddressType sysVer)
+// DYNCOIN support old sys
+bool CDynamicAddress::Set(const CTxDestination& dest, CChainParams::AddressType idVer)
 {
-    return boost::apply_visitor(CDynamicAddressVisitor(this, sysVer), dest);
+    return boost::apply_visitor(CDynamicAddressVisitor(this, idVer), dest);
 }
 
 bool CDynamicAddress::IsValid() const
@@ -341,9 +343,9 @@ bool CDynamicAddress::IsValid() const
 bool CDynamicAddress::IsValid(const CChainParams& params) const
 {
     bool fCorrectSize = vchData.size() == 20;
-	// DYNAMIC allow old DYNAMIC address scheme
+	// DYNCOIN allow old DYNCOIN address scheme
     bool fKnownVersion = vchVersion == params.Base58Prefix(CChainParams::PUBKEY_ADDRESS)     ||
-						 vchVersion == params.Base58Prefix(CChainParams::PUBKEY_ADDRESS_SEQ) ||
+						 vchVersion == params.Base58Prefix(CChainParams::PUBKEY_ADDRESS_DYN) ||
                          vchVersion == params.Base58Prefix(CChainParams::PUBKEY_ADDRESS_SEQ) ||
                          vchVersion == params.Base58Prefix(CChainParams::SCRIPT_ADDRESS)     ||
 						 vchVersion == params.Base58Prefix(CChainParams::SCRIPT_ADDRESS_SEQ);
@@ -356,9 +358,9 @@ CTxDestination CDynamicAddress::Get() const
         return CNoDestination();
     uint160 id;
     memcpy(&id, &vchData[0], 20);
-	// DYNAMIC allow old DYNAMIC address scheme
+	// DYNCOIN allow old DYNCOIN address scheme
     if (vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS) ||
-		vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS_SEQ) ||
+		vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS_DYN) ||
         vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS_SEQ))
         return CKeyID(id);
     else if (vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS) ||
@@ -366,6 +368,11 @@ CTxDestination CDynamicAddress::Get() const
         return CScriptID(id);
     else
         return CNoDestination();
+}
+
+bool CDynamicAddress::IsScript() const
+{
+    return IsValid() && (vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS) || vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS_SEQ));
 }
 
 bool CDynamicAddress::GetKeyID(CKeyID& keyID) const
@@ -377,11 +384,6 @@ bool CDynamicAddress::GetKeyID(CKeyID& keyID) const
     memcpy(&id, &vchData[0], 20);
     keyID = CKeyID(id);
     return true;
-}
-
-bool CDynamicAddress::IsScript() const
-{
-    return IsValid() && (vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS) || vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS_SEQ));
 }
 
 bool CDynamicAddress::GetIndexKey(uint160& hashBytes, int& type) const

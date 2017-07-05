@@ -49,9 +49,11 @@ public:
         PUBKEY_ADDRESS_DYN,
         PUBKEY_ADDRESS_SEQ,
         SCRIPT_ADDRESS,
+        SCRIPT_ADDRESS_DYN,
         SCRIPT_ADDRESS_SEQ,
         SECRET_KEY,
         SECRET_KEY_DYN,
+        SECRET_KEY_SEQ,
         EXT_PUBLIC_KEY,
         EXT_SECRET_KEY,
 
@@ -59,7 +61,6 @@ public:
     };  
     
     enum AddressType {
-		ADDRESS_OLDSYS,
         ADDRESS_DYN,
         ADDRESS_SEQ,
         MAX_ADDRESS_TYPES

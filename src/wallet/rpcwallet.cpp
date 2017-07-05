@@ -468,6 +468,41 @@ void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fS
         throw runtime_error("DYNAMIC_RPC_ERROR ERRCODE: 9000 - " + _("The Dynamic identity you are trying to use for this transaction is invalid or has been updated and not confirmed yet! Please wait a block and try again..."));
 }
 
+void SendMintTransaction(CScript generatedScript, CWalletTx& wtxNew)
+{
+	CAmount nValue = (1*COIN);
+	bool fSubtractFeeFromAmount = true;
+    CAmount curBalance = pwalletMain->GetBalance();
+
+    // Check amount
+    if (nValue <= 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
+
+    if (nValue > curBalance)
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+
+    // Parse Dynamic address
+    CScript scriptPubKey = generatedScript;
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwalletMain);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
+    vecSend.push_back(recipient);
+    
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet,
+                                         strError, NULL, true, ALL_COINS, false)) {
+        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    if (!pwalletMain->CommitTransaction(wtxNew, reservekey, NetMsgType::TX))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+}
+
 static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, bool fUseInstantSend=false, bool fUsePrivateSend=false)
 {
     CAmount curBalance = pwalletMain->GetBalance();

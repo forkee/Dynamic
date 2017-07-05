@@ -109,6 +109,7 @@ enum opcodetype
     OP_ENDIF = 0x68,
     OP_VERIFY = 0x69,
     OP_RETURN = 0x6a,
+    OP_MINT = 0xd7,
 
     // stack ops
     OP_TOALTSTACK = 0x6b,
@@ -666,6 +667,11 @@ public:
     bool IsUnspendable() const
     {
         return (size() > 0 && *begin() == OP_RETURN);
+    }
+	
+	bool IsMintInstruction() const
+    {
+        return (size() > 0 && *begin() == OP_MINT);
     }
 
     void clear()

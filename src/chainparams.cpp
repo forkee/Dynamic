@@ -97,7 +97,7 @@ static void MineGenesis(CBlockHeader& genesisBlock, const uint256& powLimit, boo
  */
 static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
-    const char* pszTimestamp = "NY Times 03/18/2017: Britain Livid on Spying Claim, but Trump Isn’t Apologizing";
+    const char* pszTimestamp = "BBC News 06/07/17: LHC double heavy particle to shine light on strong force";
     const CScript genesisOutputScript = CScript() << ParseHex("") << OP_CHECKSIG;
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
@@ -156,11 +156,11 @@ public:
         pchMessageStart[3] = 0x61;
         vAlertPubKey = ParseHex("04ae9821c0e83ed7b23a08513047ec23e3acf41be066239d48c7571032efc858b30af168516aaf3320f57c431cf697de8dfd00b0c86112c231dbef04de46b8a731");
         nDefaultPort = 31300;
-        nMaxTipAge = 24 * 60 * 64;
+        nMaxTipAge = 12 * 60 * 64;
         nPruneAfterHeight = 20545;
-        startNewChain = false;
+        startNewChain = true;
 
-        genesis = CreateGenesisBlock(1489863148, 423094, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
+        genesis = CreateGenesisBlock(1499353265, 0, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
         if(startNewChain == true) { MineGenesis(genesis, consensus.powLimit, true); }
 
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -175,19 +175,17 @@ public:
         vSeeds.push_back(CDNSSeedData("dnsseeder.host", "dyn.dnsseeder.host"));
         vSeeds.push_back(CDNSSeedData("dnsseeder.net", "dyn.dnsseeder.net"));
 
-        // Dynamic addresses start with 'D'
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,30);
-        // Dynamic script addresses start with '5'
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,10);
-        // Dynamic private keys start with 'y'
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,140);
-        // Dynamic BIP32 pubkeys start with 'xpub' (Bitcoin defaults)
-        base58Prefixes[EXT_PUBLIC_KEY] = boost::assign::list_of(0x04)(0x88)(0xB2)(0x1E).convert_to_container<std::vector<unsigned char> >();
-        // Dynamic BIP32 prvkeys start with 'xprv' (Bitcoin defaults)
+        base58Prefixes[PUBKEY_ADDRESS] 	= base58Prefixes[PUBKEY_ADDRESS_DYN] 	= std::vector<unsigned char>(1,30);
+										  base58Prefixes[PUBKEY_ADDRESS_SEQ] 	= std::vector<unsigned char>(1,63);
+        base58Prefixes[SCRIPT_ADDRESS] 	= base58Prefixes[SCRIPT_ADDRESS_DYN] 	= std::vector<unsigned char>(1,10);
+										  base58Prefixes[SCRIPT_ADDRESS_SEQ] 	= std::vector<unsigned char>(1,64);
+		base58Prefixes[SECRET_KEY] 		= base58Prefixes[SECRET_KEY_DYN] 		= std::vector<unsigned char>(1,140);
+										  base58Prefixes[SECRET_KEY_SEQ] 		= std::vector<unsigned char>(1,170);
+		
+		base58Prefixes[EXT_PUBLIC_KEY] = boost::assign::list_of(0x04)(0x88)(0xB2)(0x1E).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] = boost::assign::list_of(0x04)(0x88)(0xAD)(0xE4).convert_to_container<std::vector<unsigned char> >();
-        // Dynamic BIP44 coin type is '5'
         nExtCoinType = 5;
-
+        
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
         fMiningRequiresPeers = true;
@@ -209,12 +207,12 @@ public:
             ( 2000, uint256S("0x00000c8d245d50f5367fce0395968eede651a57f7d3109391de2a1b1127a3d65"))
             ( 4000, uint256S("0x000009bb9a4bede31a48de0d0b5855f2216f010b8b9e1b841904e727b96170dd"))
             ( 8000, uint256S("0x000004afc06a08b1ffff872beb61bf8d24c3f7917b47fb34a538038dbb69d47c"))
-	    ( 16000, uint256S("0x000007acf3133e96fbd19c269dda826a7d493390ff581c8125c8f56769c3959a"))
-	    ( 20547, uint256S("0x000007e2309c07f0c75e2bd31122e2062c24afd4b8a9981b4706f3f9083c5adc"))
+			( 16000, uint256S("0x000007acf3133e96fbd19c269dda826a7d493390ff581c8125c8f56769c3959a"))
+			( 20547, uint256S("0x000007e2309c07f0c75e2bd31122e2062c24afd4b8a9981b4706f3f9083c5adc"))
             ( 32000, uint256S("0x00000fb0818a910115ee27577621e8867824f578958fec651423ae8d67d6c6c4"))
-   	    ( 48000, uint256S("0x000008b04997bc4b28909d42b2ce7b15c550609bd08d3a089572885ddce31679"))
-	    ( 64000, uint256S("0x0000014bfcfcd0a0c09508f35aa274e6f181a6e9cfc695498a49a539499de6e5"))
-	    ( 92000, uint256S("0x00000352b5397a483a4cbc8942647f8be0e513d4386d2adfcb03a6299326cd1a")),
+			( 48000, uint256S("0x000008b04997bc4b28909d42b2ce7b15c550609bd08d3a089572885ddce31679"))
+			( 64000, uint256S("0x0000014bfcfcd0a0c09508f35aa274e6f181a6e9cfc695498a49a539499de6e5"))
+			( 92000, uint256S("0x00000352b5397a483a4cbc8942647f8be0e513d4386d2adfcb03a6299326cd1a")),
             1489863148, // * UNIX timestamp of last checkpoint block
             0,          // * total number of transactions between genesis and last checkpoint
             //   (the tx=... number in the SetBestChain debug.log lines)
