@@ -413,24 +413,25 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
         // Compute regular coinbase transaction.
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        if (!GetMintingInstructions(previousBlock, validationState, address, fluidIssuance) && !isItUsable) {
-			txNew.vout[0].nValue = blockReward;
-		} else {
+        if (GetMintingInstructions(previousBlock, validationState, address, fluidIssuance) && isItUsable) {
 			txNew.vout[0].nValue = blockReward + fluidIssuance;
+			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
 			areWeMinting = true;
+		} else {
+			txNew.vout[0].nValue = blockReward;
+			LogPrintf("FluidMinting: Previous block does not contain any minting instructions, continuing with block creation\n");
 		}
 		
         txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
 
-        if (areWeMinting && isItUsable) {
+        if (areWeMinting) {
             // Pick out the amount of issuance
             txNew.vout[0].nValue -= fluidIssuance;
+			
+			assert(address.IsValid());	
+			CScript script = GetScriptForDestination(address.Get());
 
-			assert(address.IsValid());
-			assert(address.IsScript());
-			CScriptID scriptID = boost::get<CScriptID>(address.Get());
-			CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
-
+			LogPrintf("FluidMinting: Created transaction script for block, script: %s\n", ScriptToAsmStr(script));
             txNew.vout.push_back(CTxOut(fluidIssuance, script));
 		}
 

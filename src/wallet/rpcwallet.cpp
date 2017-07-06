@@ -471,7 +471,7 @@ void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fS
 void SendMintTransaction(CScript generatedScript, CWalletTx& wtxNew)
 {
 	CAmount nValue = (1*COIN);
-	bool fSubtractFeeFromAmount = true;
+	bool fSubtractFeeFromAmount = false;
     CAmount curBalance = pwalletMain->GetBalance();
 
     // Check amount

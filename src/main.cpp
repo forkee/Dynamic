@@ -2807,13 +2807,19 @@ static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
+extern bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
+extern bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
+
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck, const bool fWriteNames)
 {
     const CChainParams& chainparams = Params();
     AssertLockHeld(cs_main);
 
     int64_t nTimeStart = GetTimeMicros();
-
+    
+    CAmount nValueIn = 0;
+    CAmount nValueOut = 0;
+    
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
         return false;
@@ -2999,6 +3005,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             }
 
             nFees += view.GetValueIn(tx)-tx.GetValueOut();
+			
+			nValueIn += view.GetValueIn(tx);
+            nValueOut += tx.GetValueOut();
 
             std::vector<CScriptCheck> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
@@ -3068,12 +3077,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     else if (chainActive.Height() <= Params().GetConsensus().nDynodePaymentsStartBlock) {
         fDynodePaid = false;
     }
+    
+	CBlock previousBlock;
+	CDynamicAddress addressX;
+	CValidationState validationState;
+	CAmount nExpectedBlockValue, fluidIssuance;
+	std::string strError = "";
 
-    CAmount nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
-    std::string strError = "";
-
-    if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)){
-        return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
+	bool isItUsable = DerivePreviousBlockInformation(previousBlock, pindex->pprev); // We need the entire previous block to check!
+	if (GetMintingInstructions(previousBlock, validationState, addressX, fluidIssuance) && isItUsable) {
+	    nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees) + fluidIssuance;
+	} else {
+		nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
+	}
+	
+    if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError) && !isItUsable) {
+		return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
     }
 
     if (!IsBlockPayeeValid(block.vtx[0], pindex->nHeight, nExpectedBlockValue)) {
@@ -3095,6 +3114,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Dynamic: collect valid name tx
     // NOTE: tx.UpdateCoins should not affect this loop, probably...
     std::vector<CAmount> vFees (block.vtx.size(), 0);
+	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
