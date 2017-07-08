@@ -46,13 +46,14 @@
 #include "validationinterface.h"
 #include "versionbits.h"
 #include "checkforks.h"
+#include "protocol/fluid.h"
 
-#include "syscoin/identity.h"
-#include "syscoin/offer.h"
-#include "syscoin/escrow.h"
-#include "syscoin/message.h"
-#include "syscoin/cert.h"
-#include "syscoin/offer.h"
+#include "protocol/identity.h"
+#include "protocol/offer.h"
+#include "protocol/escrow.h"
+#include "protocol/message.h"
+#include "protocol/cert.h"
+#include "protocol/offer.h"
 
 #include <atomic>
 #include <sstream>
@@ -1034,8 +1035,6 @@ int GetISConfirmations(const uint256 &nTXHash)
 
     return 0;
 }
-
-extern bool VerifyInstruction(std::string uniqueIdentifier);
 
 bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
@@ -2806,9 +2805,6 @@ static int64_t nTimeConnect = 0;
 static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
-
-extern bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
-extern bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
 
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck, const bool fWriteNames)
 {

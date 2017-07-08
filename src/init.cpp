@@ -17,7 +17,7 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
-//#include "syscoin/dyndns.h"
+//#include "protocol/dyndns.h"
 #include "dynode-payments.h"
 #include "dynode-sync.h"
 #include "dynodeconfig.h"
@@ -57,11 +57,11 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
-#include "syscoin/identity.h"
-#include "syscoin/offer.h"
-#include "syscoin/cert.h"
-#include "syscoin/escrow.h"
-#include "syscoin/message.h"
+#include "protocol/identity.h"
+#include "protocol/offer.h"
+#include "protocol/cert.h"
+#include "protocol/escrow.h"
+#include "protocol/message.h"
 
 #include <stdint.h>
 #include <stdio.h>

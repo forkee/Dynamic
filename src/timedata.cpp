@@ -17,6 +17,8 @@
 
 static CCriticalSection cs_nTimeOffset;
 static int64_t nTimeOffset = 0;
+extern int64_t nNtpOffset;
+static int64_t nNodesOffset = std::numeric_limits<int64_t>::max();
 
 /**
  * "Never go to sea with two chronometers; take one or three."
@@ -25,20 +27,26 @@ static int64_t nTimeOffset = 0;
  *  - Median of other nodes clocks
  *  - The user (asking the user to fix the system clock if the first two disagree)
  */
+
+static int64_t abs64(int64_t n)
+{
+    return (n >= 0 ? n : -n);
+}
+
 int64_t GetTimeOffset()
 {
     LOCK(cs_nTimeOffset);
+	
+	// If NTP and system clock are in agreement within 40 minutes, then use NTP.
+    if (abs64(nNtpOffset) < 40 * 60)
+        return nNtpOffset;
+
     return nTimeOffset;
 }
 
 int64_t GetAdjustedTime()
 {
     return GetTime() + GetTimeOffset();
-}
-
-static int64_t abs64(int64_t n)
-{
-    return (n >= 0 ? n : -n);
 }
 
 #define DYNAMIC_TIMEDATA_MAX_SAMPLES 200

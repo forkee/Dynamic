@@ -6,7 +6,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
-#include "syscoin/identity.h"
+#include "protocol/identity.h"
 #include "base58.h"
 #include "chain.h"
 #include "core_io.h"

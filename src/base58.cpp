@@ -8,7 +8,7 @@
 #include "base58.h"
 
 #include "hash.h"
-#include "syscoin/identity.h"
+#include "protocol/identity.h"
 #include "uint256.h"
 
 #include <assert.h>

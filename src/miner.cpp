@@ -29,6 +29,7 @@
 #include "consensus/validation.h"
 #include "validationinterface.h"
 #include "wallet/wallet.h"
+#include "protocol/fluid.h"
 
 #include <queue>
 #include <utility>
@@ -197,9 +198,6 @@ bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet,
 
     return true;
 }
-
-extern bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
-extern bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
 
 std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn)
 {

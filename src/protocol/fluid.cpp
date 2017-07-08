@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Everybody and Nobody Inc.
+ * Copyright 2017 Everybody and Nobody (Empinel/Plaxton)
  * 
  * Permission is hereby granted, free of charge, to any person 
  * obtaining a copy of this software and associated documentation files 
@@ -8,7 +8,7 @@
  * distribute, sublicense, and/or sell copies of the Software, and to 
  * permit persons to whom the Software is furnished to do so, subject 
  * to the following conditions:
-1 *
+ *
  * The above copyright notice and this permission notice shall be included in 
  * all copies or substantial portions of the Software.
  * 
@@ -20,84 +20,30 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "base58.h"
-#include "amount.h"
-#include "chain.h"
 #include "core_io.h"
+#include "wallet/wallet.h"
+#include "wallet/walletdb.h"
+#include "init.h"
+#include "keepass.h"
+#include "net.h"
+#include "netbase.h"
+#include "rpcserver.h"
+#include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-#include "wallet/wallet.h"
-#include "wallet/walletdb.h"
-#include "script/script.h"
-#include "main.h"
-#include "init.h"
-#include "keepass.h"
-#include "main.h"
-#include "net.h"
-#include "netbase.h"
-#include "policy/rbf.h"
-#include "rpcserver.h"
-#include "timedata.h"
-#include "amount.h"
 
 #include <univalue.h>
 
-#include <stdint.h>
-#include <algorithm>
-
+#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-
-static const int OP_FAILURE = 0x00;
-static const CAmount MIN_MINTING = 100 * COIN;
-
-static CScript failedOperation = OP_FAILURE;
 
 extern bool EnsureWalletIsAvailable(bool avoidException);
 extern void SendMintTransaction(CScript generatedScript, CWalletTx& wtxNew);
 
-int64_t DeriveSupplyPercentage(int64_t percentage) {
-	return chainActive.Tip()->nMoneySupply * percentage / 100;
-}
-	
-std::string StringToHex(std::string input) {
-	static const char* const lut = "0123456789ABCDEF";
-	size_t len = input.length();
-	std::string output;
-	output.reserve(2 * len);
-	for (size_t i = 0; i < len; ++i)
-	{
-		const unsigned char c = input[i];
-		output.push_back(lut[c >> 4]);
-		output.push_back(lut[c & 15]);
-	}
-	
-	return output;
-}
-	
-std::string HexToString(std::string in) {
-	std::string output;
-	if ((in.length() % 2) != 0) {
-		throw std::runtime_error("String is not valid length ...");
-	}
-		size_t cnt = in.length() / 2;
-		for (size_t i = 0; cnt > i; ++i) {
-			uint32_t s = 0;
-			std::stringstream ss;
-			ss << std::hex << in.substr(i * 2, 2);
-			ss >> s;
-				output.push_back(static_cast<unsigned char>(s));
-	}
-	return output;
-}
+Fluid fluid;
 
-static const int64_t fluidMintingMinimum = 100 * COIN;
-static const int64_t fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10%
-
-void ConvertToHex(std::string &input) { std::string output = StringToHex(input); input = output; }
-void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }
-
-bool GenerateFluidToken(CDynamicAddress sendToward, 
+bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
 						CAmount tokenMintAmt, std::string &issuanceString) {
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
 	
@@ -140,14 +86,7 @@ bool GenerateFluidToken(CDynamicAddress sendToward,
     return true;
 }
 
-CScript AssimilateMintingScript(CDynamicAddress reciever, CAmount howMuch) {
-	std::string issuanceString;
-	if(!GenerateFluidToken(reciever, howMuch, issuanceString))
-		return CScript() << OP_RETURN;
-	else return CScript() << OP_MINT << ParseHex(issuanceString);
-}
-
-bool VerifyInstruction(std::string uniqueIdentifier)
+bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
 {
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 	
@@ -200,7 +139,7 @@ bool VerifyInstruction(std::string uniqueIdentifier)
 }
 
 /** Checks if scriptPubKey is that of the hardcoded addresses */
-bool IsItHardcoded(std::string givenScriptPubKey) {
+bool Fluid::IsItHardcoded(std::string givenScriptPubKey) {
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 	
 #ifdef ENABLE_WALLET /// Assume that address is valid
@@ -216,7 +155,7 @@ bool IsItHardcoded(std::string givenScriptPubKey) {
 }
 
 /** Does client instance own address for engaging in processes - required for RPC (PS: NEEDS wallet) */
-bool InitiateFluidVerify(CDynamicAddress dynamicAddress) {
+bool Fluid::InitiateFluidVerify(CDynamicAddress dynamicAddress) {
 #ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
 	CDynamicAddress address(dynamicAddress);
@@ -239,56 +178,7 @@ bool InitiateFluidVerify(CDynamicAddress dynamicAddress) {
 #endif
 }
 
-UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
-{
-	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
-	
-	CScript finalScript;
-	std::string processedMessage;
-
-    if (!EnsureWalletIsAvailable(fHelp))
-        return NullUniValue;
-    
-    if (fHelp || params.size() < 1 || params.size() > 3)
-        throw std::runtime_error(
-            "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
-            "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
-            "\nArguments:\n"
-            "1. \"dynamicaddress\"  (string, required) The dynamic address to mint the coins toward.\n"
-            "2. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
-            + HelpExampleRpc("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
-        );
-
-    EnsureWalletIsUnlocked();
-    
-    CDynamicAddress address(params[0].get_str());
-    if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Dynamic address");
-    
-    CAmount nAmount = AmountFromValue(params[1]);
-    if (nAmount <= fluidMintingMinimum || nAmount >= fluidMintingMaximum)
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send, outside bounds");
-    
-	if (!InitiateFluidVerify(sovreignAddress))
-		throw JSONRPCError(RPC_TYPE_ERROR, "Attempting Illegal Operation - Credentials Absent!");
-		    
-    finalScript = AssimilateMintingScript(address, nAmount);
-    
-    if (!VerifyInstruction(ScriptToAsmStr(finalScript)))
-		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
-    
-	CWalletTx wtx;
-	LogPrintf("FluidMinting (RPCCommand): Generated Final Script to be broadcasted: %s\n", ScriptToAsmStr(finalScript));
-    SendMintTransaction(finalScript, wtx);
-
-    return wtx.GetHash().GetHex();
-}
-
-#include <boost/lexical_cast.hpp>
-
-bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, int64_t &coinAmount, std::string uniqueIdentifier) {
+bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
 	int64_t issuanceTime;
 	
 	// Step 0: Check if token is even valid
@@ -344,10 +234,7 @@ bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, int64_t &coinAmou
 	return true;
 }
 
-//
-// CScript scriptCheck = CScript() << OP_MINT << ParseHex("3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a55716777382b41426a39536b62656a6b47754773536a69556c6b6c616832514b314a676258525642613379515a33785a586b5249632f6633526951526458794552724a36595979764c306b787945786573733d");
-//
-bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
+bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		LogPrintf("FluidMinting (GetMintingInstructions): Starting process of verification! %s\n", "STARTED!");
         if (!CheckTransaction(tx, state))
@@ -376,7 +263,7 @@ bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynam
 	return false;
 }
 
-bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
+bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
     uint256 hash = fromDerive->GetBlockHash();
     LogPrintf("FluidMinting (DerivePreviousBlockInformation): Starting to extract block from hash: %s\n", hash.ToString());
     
@@ -398,3 +285,51 @@ bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
 	}
     return true;
 }
+
+UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
+{
+	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	
+	CScript finalScript;
+	std::string processedMessage;
+
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+    
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw std::runtime_error(
+            "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
+            "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
+            "\nArguments:\n"
+            "1. \"dynamicaddress\"  (string, required) The dynamic address to mint the coins toward.\n"
+            "2. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
+            + HelpExampleRpc("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
+        );
+
+    EnsureWalletIsUnlocked();
+    
+    CDynamicAddress address(params[0].get_str());
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Dynamic address");
+    
+    CAmount nAmount = AmountFromValue(params[1]);
+    if (nAmount <= fluidMintingMinimum || nAmount >= fluidMintingMaximum)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send, outside bounds");
+    
+	if (!InitiateFluidVerify(sovreignAddress))
+		throw JSONRPCError(RPC_TYPE_ERROR, "Attempting Illegal Operation - Credentials Absent!");
+		    
+    finalScript = AssimilateMintingScript(address, nAmount);
+    
+    if (!VerifyInstruction(ScriptToAsmStr(finalScript)))
+		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
+    
+	CWalletTx wtx;
+	LogPrintf("FluidMinting (RPCCommand): Generated Final Script to be broadcasted: %s\n", ScriptToAsmStr(finalScript));
+    SendMintTransaction(finalScript, wtx);
+
+    return wtx.GetHash().GetHex();
+}
+
