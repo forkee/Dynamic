@@ -33,13 +33,21 @@ class CBlock;
 class CBlockTemplate;
 
 //
-// CScript scriptCheck = CScript() << OP_MINT << ParseHex("3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a55716777382b41426a39536b62656a6b47754773536a69556c6b6c616832514b314a676258525642613379515a33785a586b5249632f6633526951526458794552724a36595979764c306b787945786573733d");
+// Ideal Script Formation Example:
+//
+// OP_MINT 3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773
+//         82b41426a39536b62656a6b47754773536a69556c6b6c616832514b314a676258525642613379515a33785a586b5249632f6633526951526458794552724a36595979764c306b
+//         787945786573733d
 //
 
 class Fluid {
 private:
 	CAmount DeriveSupplyPercentage(int64_t percentage) {
 		return chainActive.Tip()->nMoneySupply * percentage / 100;
+	}
+	
+	CAmount DeriveSupplyBurnt() {
+		return 0 * COIN; // We create trackable money supply
 	}
 	
 	// TODO: Switch to CryptoPP
@@ -77,7 +85,8 @@ private:
 
 public:
 	static const CAmount fluidMintingMinimum = 100 * COIN;
-	static const CAmount fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10%
+	static const CAmount fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10% can be minted!
+	static const CAmount fluidMasterAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 
 	void ConvertToHex(std::string &input) { std::string output = StringToHex(input); input = output; }
 	void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }

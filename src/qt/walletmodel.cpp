@@ -8,7 +8,7 @@
 #include "walletmodel.h"
 
 #include "addresstablemodel.h"
-#include "dnstablemodel.h"
+// #include "dnstablemodel.h"
 #include "guiconstants.h"
 #include "guiutil.h"
 #include "paymentserver.h"
@@ -56,7 +56,7 @@ WalletModel::WalletModel(const PlatformStyle *platformStyle, CWallet *_wallet, O
     addressTableModel = new AddressTableModel(wallet, this);
     transactionTableModel = new TransactionTableModel(platformStyle, wallet, this);
     recentRequestsTableModel = new RecentRequestsTableModel(wallet, this);
-    nameTableModel = new NameTableModel(wallet, this);
+    // nameTableModel = new NameTableModel(wallet, this);
 
     // This timer will be fired repeatedly to update the balance
     pollTimer = new QTimer(this);
@@ -158,8 +158,8 @@ void WalletModel::pollBalanceChanged()
             transactionTableModel->updateConfirmations();
 
         //TODO: perhaps redo this. Currently it rescans all tx available in wallet - idealy we do not need such scan.
-        if (nameTableModel)
-            nameTableModel->update();
+        /* if (nameTableModel)
+            nameTableModel->update(); */
     }
 }
 
@@ -415,11 +415,11 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
                 if (mi == wallet->mapAddressBook.end())
                 {
                     wallet->SetAddressBook(dest, strLabel, "send");
-                }
+                }/*
                 else if (mi->second.name != strLabel)
                 {
                     wallet->SetAddressBook(dest, strLabel, ""); // "" means don't change purpose
-                }
+                }*/
             }
         }
         Q_EMIT coinsSent(wallet, rcp, transaction_array);
@@ -760,8 +760,9 @@ CWallet* WalletModel::getWallet()
 {
     return wallet;
 }
-
+/*
 NameTableModel *WalletModel::getNameTableModel()
 {
     return nameTableModel;
 }
+*/

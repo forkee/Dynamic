@@ -16,7 +16,6 @@
 #include "uint256.h"
 
 typedef std::vector<unsigned char> valtype;
-bool fConsiderSize = false; // DONT DO THIS ON PRODUCTION NETWORK
 
 namespace {
 
@@ -248,7 +247,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
     std::vector<bool> vfExec;
     std::vector<valtype> altstack;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-    if (script.size() > 10000 && fConsiderSize)
+    if (script.size() > 10000)
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;

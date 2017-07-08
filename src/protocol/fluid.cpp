@@ -40,11 +40,13 @@
 
 extern bool EnsureWalletIsAvailable(bool avoidException);
 extern void SendMintTransaction(CScript generatedScript, CWalletTx& wtxNew);
+// extern void SendDestroyTransaction(CScript generatedScript, CAmount howMuch, CWalletTx& wtxNew);
 
 Fluid fluid;
 
 bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
 						CAmount tokenMintAmt, std::string &issuanceString) {
+	
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
 	
 	if(!sendToward.IsValid())
@@ -52,7 +54,6 @@ bool Fluid::GenerateFluidToken(CDynamicAddress sendToward,
 	
 	std::string unsignedMessage;
 	unsignedMessage = std::to_string(tokenMintAmt) + "::" + std::to_string(GetTime()) + "::" + sendToward.ToString();
-	LogPrintf("FluidMinting (GenerateFluidToken): Created Fluid Unsigned Token, %s \n", unsignedMessage);
 	
 	CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic;
@@ -78,9 +79,7 @@ bool Fluid::GenerateFluidToken(CDynamicAddress sendToward,
 		LogPrintf("FluidMinting (GenerateFluidToken): Token Mint Quantity is either too big or too small, %s \n", tokenMintAmt);
 		return false;
 	}
-	
-	LogPrintf("FluidMinting (GenerateFluidToken): Created Fluid Signed Token, %s \n", issuanceString);
-	
+		
 	ConvertToHex(issuanceString);
 		
     return true;
@@ -95,8 +94,6 @@ bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
 	uniqueIdentifier = transverser.at(1);
 	CDynamicAddress addr(sovreignAddress);
     
-   	LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification Started! Hex String is %s \n", uniqueIdentifier);
-
     CKeyID keyID;
     if (!addr.GetKeyID(keyID))
 		return false;
@@ -134,7 +131,6 @@ bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
 		return false;
 	}
 	
-	LogPrintf("FluidMinting (VerifyInstruction): Verification Process Complete! Instruction Verification Complete\n");
 	return true;
 }
 
@@ -179,34 +175,29 @@ bool Fluid::InitiateFluidVerify(CDynamicAddress dynamicAddress) {
 }
 
 bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
+
 	int64_t issuanceTime;
 	
 	// Step 0: Check if token is even valid
 	if (!VerifyInstruction(uniqueIdentifier)) {
 		LogPrintf("FluidMinting (ParseMintKey): VerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
 		return false;
-	} else {
-		LogPrintf("FluidMinting (ParseMintKey): VerifyInstruction SUCCEEDED! Will continue!, identifier: %s\n", uniqueIdentifier);
 	}
 	
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::vector<std::string> transverser;
 	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
 	uniqueIdentifier = transverser.at(1);
-	LogPrintf("FluidMinting (ParseMintKey): Derived unique identifier as %s\n", uniqueIdentifier);
 	
 	// Step 1.2: Convert new Hex Data to dehexed token
 	std::string dehexString = HexToString(uniqueIdentifier);
 	uniqueIdentifier = dehexString;
-	LogPrintf("FluidMinting (ParseMintKey): Dehexed string as %s\n", uniqueIdentifier);
 	
 	// Step 2: Convert the Dehexed Token to sense
 	std::vector<std::string> strs, ptrs;
 	std::string::size_type size, sizeX;
 	boost::split(strs, dehexString, boost::is_any_of(" "));
 	boost::split(ptrs, strs.at(0), boost::is_any_of("::"));
-	
-	LogPrintf("FluidMinting (ParseMintKey): Attempt to derive information is as such, coinAmount: %s, issuanceTime: %s, recipientAddress: %s\n", ptrs.at(0), ptrs.at(2), ptrs.at(4));
 	
 	// Step 3: Convert the token to our variables
 	std::string lr = ptrs.at(0); std::string::iterator end_pos = std::remove(lr.begin(), lr.end(), ' '); lr.erase(end_pos, lr.end());
@@ -223,10 +214,9 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 
 	std::string recipientAddress = ptrs.at(4);
 	destination.SetString(recipientAddress);
-	LogPrintf("FluidMinting (ParseMintKey): Derived information is as such, coinAmount: %s, issuanceTime: %s, recipientAddress: %s\n", coinAmount, issuanceTime, recipientAddress);
 	
-	// if (GetTime() + 15 * 60 < issuanceTime || GetTime() - 15 * 60 > issuanceTime)
-	//	return 0 * COIN;
+	if (GetTime() + 15 * 60 > issuanceTime || GetTime() - 15 * 60 < issuanceTime)
+		return false;
 		
 	if(!destination.IsValid() || coinAmount < fluidMintingMinimum || coinAmount > fluidMintingMaximum)
 		return false;
@@ -236,22 +226,17 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 
 bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
-		LogPrintf("FluidMinting (GetMintingInstructions): Starting process of verification! %s\n", "STARTED!");
         if (!CheckTransaction(tx, state))
 			LogPrintf("FluidMinting (GetMintingInstructions): Failed preliminary transaction verification!\n");
 		else {
 			BOOST_FOREACH(const CTxOut& txout, tx.vout) {
-				LogPrintf("FluidMinting (GetMintingInstructions): Successfully passed preliminary transaction verification!\n");
 				if (txout.scriptPubKey.IsMintInstruction()) {
-					LogPrintf("FluidMinting (GetMintingInstructions): We have found minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); 
 					if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
 						LogPrintf("FluidMinting (GetMintingInstructions): FAILED instruction verification!\n");
 					else {
-						LogPrintf("FluidMinting (GetMintingInstructions): Successfully verified instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey));
 						if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey)))
 							LogPrintf("FluidMinting (GetMintingInstructions): Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
 						else { 
-							LogPrintf("FluidMinting (GetMintingInstructions): Successfully parsed key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey)); 
 							return true; // Sweet, sweet minting!
 						}
 					} 
@@ -259,14 +244,12 @@ bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state,
 			 }
 		}
 	}
-	LogPrintf("FluidMinting (GetMintingInstructions): FAILED! Unknown Reason\n");
 	return false;
 }
 
 bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
     uint256 hash = fromDerive->GetBlockHash();
-    LogPrintf("FluidMinting (DerivePreviousBlockInformation): Starting to extract block from hash: %s\n", hash.ToString());
-    
+
     if (mapBlockIndex.count(hash) == 0) {
       	LogPrintf("FluidMinting (DerivePreviousBlockInformation): Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
         return false;
@@ -283,6 +266,7 @@ bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDeriv
 		LogPrintf("FluidMinting (DerivePreviousBlockInformation): Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
         return false;
 	}
+	
     return true;
 }
 
@@ -327,9 +311,54 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
 		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
     
 	CWalletTx wtx;
-	LogPrintf("FluidMinting (RPCCommand): Generated Final Script to be broadcasted: %s\n", ScriptToAsmStr(finalScript));
     SendMintTransaction(finalScript, wtx);
 
     return wtx.GetHash().GetHex();
 }
+/*
+UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
+{
+	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	
+	CScript finalScript;
+	std::string processedMessage;
 
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+    
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw std::runtime_error(
+            "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
+            "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
+            "\nArguments:\n"
+            "1. \"dynamicaddress\"  (string, required) The dynamic address to mint the coins toward.\n"
+            "2. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
+            + HelpExampleRpc("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
+        );
+
+    EnsureWalletIsUnlocked();
+    
+    CDynamicAddress address(params[0].get_str());
+    if (!address.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Dynamic address");
+    
+    CAmount nAmount = AmountFromValue(params[1]);
+    if (nAmount <= fluidMintingMinimum || nAmount >= fluidMintingMaximum)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send, outside bounds");
+    
+	if (!InitiateFluidVerify(sovreignAddress))
+		throw JSONRPCError(RPC_TYPE_ERROR, "Attempting Illegal Operation - Credentials Absent!");
+		    
+    finalScript = AssimilateMintingScript(address, nAmount);
+    
+    if (!VerifyInstruction(ScriptToAsmStr(finalScript)))
+		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
+    
+	CWalletTx wtx;
+    SendMintTransaction(finalScript, wtx);
+
+    return wtx.GetHash().GetHex();
+}
+*/

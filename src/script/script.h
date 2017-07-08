@@ -52,6 +52,10 @@ enum opcodetype
     OP_IDENTITY_UPDATE=0xd5,
 	OP_IDENTITY_MULTISIG = 0xd6,
 
+	// fluid management system
+    OP_MINT = 0xd7,
+	OP_DESTROY = 0xd8,
+	
     // distributed exchange
     OP_OFFER_ACTIVATE=0x04,
     OP_OFFER_UPDATE=0x05,
@@ -109,7 +113,6 @@ enum opcodetype
     OP_ENDIF = 0x68,
     OP_VERIFY = 0x69,
     OP_RETURN = 0x6a,
-    OP_MINT = 0xd7,
 
     // stack ops
     OP_TOALTSTACK = 0x6b,
