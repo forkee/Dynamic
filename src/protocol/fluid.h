@@ -29,6 +29,9 @@
 #include <string.h>
 #include <algorithm>
 
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
+
 class CBlock;
 class CBlockTemplate;
 
@@ -42,10 +45,8 @@ class CBlockTemplate;
 
 class Fluid {
 private:
-	CAmount DeriveSupplyPercentage(int64_t percentage) {
-		return chainActive.Tip()->nMoneySupply * percentage / 100;
-	}
-	
+	CAmount DeriveSupplyPercentage(int64_t percentage);
+		
 	CAmount DeriveSupplyBurnt() {
 		return 0 * COIN; // We create trackable money supply
 	}
@@ -85,8 +86,8 @@ private:
 
 public:
 	static const CAmount fluidMintingMinimum = 100 * COIN;
-	static const CAmount fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10% can be minted!
-	static const CAmount fluidMasterAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	CAmount fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10% can be minted!
+	std::string fluidMasterAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 
 	void ConvertToHex(std::string &input) { std::string output = StringToHex(input); input = output; }
 	void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }
@@ -98,15 +99,23 @@ public:
 		else return CScript() << OP_MINT << ParseHex(issuanceString);
 	}
 	
-	bool GenerateFluidToken(CDynamicAddress sendToward, 
-							CAmount tokenMintAmt, std::string &issuanceString);
-	bool VerifyInstruction(std::string uniqueIdentifier);
+	CScript AssimiliateDestroyScript(int64_t howMuch) {
+		std::string r = boost::lexical_cast<std::string>(howMuch); ConvertToHex(r);
+		return CScript() << OP_DESTROY << ParseHex(r);
+	}
+	
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);
-						
+
+	bool GenerateFluidToken(CDynamicAddress sendToward, 
+							CAmount tokenMintAmt, std::string &issuanceString);
+
+	bool VerifyInstruction(std::string uniqueIdentifier);					
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
 	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
 	bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
+	// void GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
+	// bool GetDestroyQuantity(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
 };
 
 extern Fluid fluid;

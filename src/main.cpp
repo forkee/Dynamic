@@ -1059,7 +1059,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 		if (txout.scriptPubKey.IsMintInstruction()) {
-			if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
+			if (!fluid.VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
 		}
     }
@@ -3080,8 +3080,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 	CAmount nExpectedBlockValue, fluidIssuance;
 	std::string strError = "";
 
-	bool isItUsable = DerivePreviousBlockInformation(previousBlock, pindex->pprev); // We need the entire previous block to check!
-	if (GetMintingInstructions(previousBlock, validationState, addressX, fluidIssuance) && isItUsable) {
+	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindex->pprev); // We need the entire previous block to check!
+	if (fluid.GetMintingInstructions(previousBlock, validationState, addressX, fluidIssuance) && isItUsable) {
 	    nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees) + fluidIssuance;
 	} else {
 		nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);

@@ -71,13 +71,14 @@ endif
 # dynamic #
 DYNAMIC_CORE_H = \
   ntp.h \
-  syscoin/identity.h \
-  syscoin/cert.h \
-  syscoin/escrow.h \
-  syscoin/feedback.h \
-  syscoin/messagecrypter.h \
-  syscoin/message.h \
-  syscoin/offer.h \
+  protocol/identity.h \
+  protocol/cert.h \
+  protocol/escrow.h \
+  protocol/feedback.h \
+  protocol/messagecrypter.h \
+  protocol/message.h \
+  protocol/offer.h \
+  protocol/fluid.h \
   activedynode.h \
   addressindex.h \
   spentindex.h \
@@ -215,13 +216,13 @@ libdynamic_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES) $(MINIUPNPC_CP
 libdynamic_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_server_a_SOURCES = \
   ntp.cpp \
-  syscoin/identity.cpp \
-  syscoin/cert.cpp \
-  syscoin/escrow.cpp \
-  syscoin/message.cpp \
-  syscoin/messagecrypter.cpp \
-  syscoin/offer.cpp \
-  fluid/fluid.cpp \
+  protocol/identity.cpp \
+  protocol/cert.cpp \
+  protocol/escrow.cpp \
+  protocol/message.cpp \
+  protocol/messagecrypter.cpp \
+  protocol/offer.cpp \
+  protocol/fluid.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \

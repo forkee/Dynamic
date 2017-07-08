@@ -32,106 +32,19 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "fluid.h"
+#include "main.h"
 
 #include <univalue.h>
 
-#include <boost/lexical_cast.hpp>
-#include <boost/algorithm/string.hpp>
-
 extern bool EnsureWalletIsAvailable(bool avoidException);
-extern void SendMintTransaction(CScript generatedScript, CWalletTx& wtxNew);
-// extern void SendDestroyTransaction(CScript generatedScript, CAmount howMuch, CWalletTx& wtxNew);
+extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CAmount nValue = (1*COIN));
 
 Fluid fluid;
 
-bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
-						CAmount tokenMintAmt, std::string &issuanceString) {
-	
-	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
-	
-	if(!sendToward.IsValid())
-		return false;
-	
-	std::string unsignedMessage;
-	unsignedMessage = std::to_string(tokenMintAmt) + "::" + std::to_string(GetTime()) + "::" + sendToward.ToString();
-	
-	CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic;
-    ss << unsignedMessage;
-    
-   	CDynamicAddress addr(sovreignAddress);
-
-    CKeyID keyID;
-    if (!addr.GetKeyID(keyID))
-		return false;
-
-	CKey key;
-    if (!pwalletMain->GetKey(keyID, key))
-		return false;
-
-    std::vector<unsigned char> vchSig;
-    if (!key.SignCompact(ss.GetHash(), vchSig))
-		return false;
-	else
-		issuanceString = unsignedMessage + " " + EncodeBase64(&vchSig[0], vchSig.size());
-	
-	if(tokenMintAmt < fluidMintingMinimum || tokenMintAmt > fluidMintingMaximum) {
-		LogPrintf("FluidMinting (GenerateFluidToken): Token Mint Quantity is either too big or too small, %s \n", tokenMintAmt);
-		return false;
-	}
-		
-	ConvertToHex(issuanceString);
-		
-    return true;
-}
-
-bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
-{
-	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
-	
-	std::vector<std::string> transverser;
-	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
-	uniqueIdentifier = transverser.at(1);
-	CDynamicAddress addr(sovreignAddress);
-    
-    CKeyID keyID;
-    if (!addr.GetKeyID(keyID))
-		return false;
-
-	ConvertToString(uniqueIdentifier);
-	std::vector<std::string> strs;
-	boost::split(strs, uniqueIdentifier, boost::is_any_of(" "));
-	
-	std::string messageTokenKey = strs.at(0);
-   	LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification, Message Token Key is %s \n", messageTokenKey);
-	std::string digestSignature = strs.at(1);
-   	LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification, Digest Signature is %s \n", digestSignature);
-
-    bool fInvalid = false;
-    std::vector<unsigned char> vchSig = DecodeBase64(digestSignature.c_str(), &fInvalid);
-
-    if (fInvalid) {
-		LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification, Digest Signature Found Invalid, Signature: %s \n", digestSignature);
-		return false;
-	}
-	
-    CHashWriter ss(SER_GETHASH, 0);
-    ss << strMessageMagic;
-    ss << messageTokenKey;
-
-    CPubKey pubkey;
-    
-    if (!pubkey.RecoverCompact(ss.GetHash(), vchSig)) {
-		LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification, Public Key Recovery Failed! Hash: %s\n", ss.GetHash().ToString());
-		return false;
-	}
-    
-    if (!(CDynamicAddress(pubkey.GetID()) == addr)) {
-		LogPrintf("FluidMinting (VerifyInstruction): Instruction Verification, Address Data Comparison Failed! Address 1: %s vs Address 2: %s \n", CDynamicAddress(pubkey.GetID()).ToString(), addr.ToString());
-		return false;
-	}
-	
-	return true;
+CAmount Fluid::DeriveSupplyPercentage(int64_t percentage) {
+	int64_t supply = chainActive.Tip()->nMoneySupply;
+	return supply * percentage / 100;
 }
 
 /** Checks if scriptPubKey is that of the hardcoded addresses */
@@ -174,13 +87,103 @@ bool Fluid::InitiateFluidVerify(CDynamicAddress dynamicAddress) {
 #endif
 }
 
+bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
+						CAmount tokenMintAmt, std::string &issuanceString) {
+	
+	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
+	
+	if(!sendToward.IsValid())
+		return false;
+	
+	std::string unsignedMessage;
+	unsignedMessage = std::to_string(tokenMintAmt) + "::" + std::to_string(GetTime()) + "::" + sendToward.ToString();
+	
+	CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic;
+    ss << unsignedMessage;
+    
+   	CDynamicAddress addr(sovreignAddress);
+
+    CKeyID keyID;
+    if (!addr.GetKeyID(keyID))
+		return false;
+
+	CKey key;
+    if (!pwalletMain->GetKey(keyID, key))
+		return false;
+
+    std::vector<unsigned char> vchSig;
+    if (!key.SignCompact(ss.GetHash(), vchSig))
+		return false;
+	else
+		issuanceString = unsignedMessage + " " + EncodeBase64(&vchSig[0], vchSig.size());
+	
+	if(tokenMintAmt < fluidMintingMinimum || tokenMintAmt > fluidMintingMaximum) {
+		LogPrintf("Fluid::GenerateFluidToken: Token Mint Quantity is either too big or too small, %s \n", tokenMintAmt);
+		return false;
+	}
+		
+	ConvertToHex(issuanceString);
+		
+    return true;
+}
+
+bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
+{
+	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	
+	std::vector<std::string> transverser;
+	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
+	uniqueIdentifier = transverser.at(1);
+	CDynamicAddress addr(sovreignAddress);
+    
+    CKeyID keyID;
+    if (!addr.GetKeyID(keyID))
+		return false;
+
+	ConvertToString(uniqueIdentifier);
+	std::vector<std::string> strs;
+	boost::split(strs, uniqueIdentifier, boost::is_any_of(" "));
+	
+	std::string messageTokenKey = strs.at(0);
+   	LogPrintf("Fluid::VerifyInstruction: Instruction Verification, Message Token Key is %s \n", messageTokenKey);
+	std::string digestSignature = strs.at(1);
+   	LogPrintf("Fluid::VerifyInstruction: Instruction Verification, Digest Signature is %s \n", digestSignature);
+
+    bool fInvalid = false;
+    std::vector<unsigned char> vchSig = DecodeBase64(digestSignature.c_str(), &fInvalid);
+
+    if (fInvalid) {
+		LogPrintf("Fluid::VerifyInstruction: Instruction Verification, Digest Signature Found Invalid, Signature: %s \n", digestSignature);
+		return false;
+	}
+	
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic;
+    ss << messageTokenKey;
+
+    CPubKey pubkey;
+    
+    if (!pubkey.RecoverCompact(ss.GetHash(), vchSig)) {
+		LogPrintf("Fluid::VerifyInstruction: Instruction Verification, Public Key Recovery Failed! Hash: %s\n", ss.GetHash().ToString());
+		return false;
+	}
+    
+    if (!(CDynamicAddress(pubkey.GetID()) == addr)) {
+		LogPrintf("Fluid::VerifyInstruction: Instruction Verification, Address Data Comparison Failed! Address 1: %s vs Address 2: %s \n", CDynamicAddress(pubkey.GetID()).ToString(), addr.ToString());
+		return false;
+	}
+	
+	return true;
+}
+
 bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
 
 	int64_t issuanceTime;
 	
 	// Step 0: Check if token is even valid
 	if (!VerifyInstruction(uniqueIdentifier)) {
-		LogPrintf("FluidMinting (ParseMintKey): VerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
+		LogPrintf("Fluid::ParseMintKey: VerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
 		return false;
 	}
 	
@@ -208,7 +211,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 		issuanceTime 			= boost::lexical_cast<int64_t>(ls);
 	}
 	catch( boost::bad_lexical_cast const& ) {
-		LogPrintf("FluidMinting (ParseMintKey): Either amount string or issuance time string are incorrect! Parsing cannot continue!\n");
+		LogPrintf("Fluid::ParseMintKey: Either amount string or issuance time string are incorrect! Parsing cannot continue!\n");
 		return false;
 	}
 
@@ -226,44 +229,48 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 
 bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
-        if (!CheckTransaction(tx, state))
-			LogPrintf("FluidMinting (GetMintingInstructions): Failed preliminary transaction verification!\n");
-		else {
-			BOOST_FOREACH(const CTxOut& txout, tx.vout) {
-				if (txout.scriptPubKey.IsMintInstruction()) {
-					if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
-						LogPrintf("FluidMinting (GetMintingInstructions): FAILED instruction verification!\n");
-					else {
-						if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey)))
-							LogPrintf("FluidMinting (GetMintingInstructions): Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
-						else { 
-							return true; // Sweet, sweet minting!
-						}
-					} 
-				} else { LogPrintf("FluidMinting (GetMintingInstructions): No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
-			 }
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsMintInstruction()) {
+				if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
+					LogPrintf("Fluid::GetMintingInstructions: FAILED instruction verification!\n");
+				else {
+					if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey)))
+						LogPrintf("Fluid::GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
+					else return true; // Sweet, sweet minting!
+				} 
+			} else { LogPrintf("Fluid::GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
 	}
 	return false;
 }
-
+/*
+void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed) {
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsDestroyScript()) {
+				DeriveDestructionInformation(ScriptToAsmStr(txout.scriptPubKey), amountDestroyed);
+			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
+		}
+	}
+}
+*/
 bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
     uint256 hash = fromDerive->GetBlockHash();
 
     if (mapBlockIndex.count(hash) == 0) {
-      	LogPrintf("FluidMinting (DerivePreviousBlockInformation): Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
+      	LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
         return false;
     }
     
     CBlockIndex* pblockindex = mapBlockIndex[hash];
 
     if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
-		LogPrintf("FluidMinting (DerivePreviousBlockInformation): Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
         return false;
 	}
     
     if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-		LogPrintf("FluidMinting (DerivePreviousBlockInformation): Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
         return false;
 	}
 	
@@ -280,7 +287,7 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
     
-    if (fHelp || params.size() < 1 || params.size() > 3)
+    if (fHelp || params.size() != 2)
         throw std::runtime_error(
             "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
             "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
@@ -299,66 +306,51 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Dynamic address");
     
     CAmount nAmount = AmountFromValue(params[1]);
-    if (nAmount <= fluidMintingMinimum || nAmount >= fluidMintingMaximum)
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send, outside bounds");
+    if (nAmount <= fluid.fluidMintingMinimum || nAmount >= fluid.fluidMintingMaximum)
+        throw JSONRPCError(RPC_TYPE_ERROR,  (std::string)"Invalid amount for send, outside bounds, cannot be under 100 DYN or over " + 
+											boost::lexical_cast<std::string>(fluid.fluidMintingMaximum) + 
+											(std::string)" DYN");
     
-	if (!InitiateFluidVerify(sovreignAddress))
+	if (!fluid.InitiateFluidVerify(sovreignAddress))
 		throw JSONRPCError(RPC_TYPE_ERROR, "Attempting Illegal Operation - Credentials Absent!");
 		    
-    finalScript = AssimilateMintingScript(address, nAmount);
+    finalScript = fluid.AssimilateMintingScript(address, nAmount);
     
-    if (!VerifyInstruction(ScriptToAsmStr(finalScript)))
+    if (!fluid.VerifyInstruction(ScriptToAsmStr(finalScript)))
 		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
     
 	CWalletTx wtx;
-    SendMintTransaction(finalScript, wtx);
+    SendCustomTransaction(finalScript, wtx);
 
     return wtx.GetHash().GetHex();
 }
-/*
-UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
+
+UniValue burndynamic(const UniValue& params, bool fHelp)
 {
-	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
-	
-	CScript finalScript;
-	std::string processedMessage;
+ 	CWalletTx wtx;
 
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
     
-    if (fHelp || params.size() < 1 || params.size() > 3)
+    if (fHelp || params.size() != 1)
         throw std::runtime_error(
-            "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
-            "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
+            "generatefluidissuetoken \"amount\"\n"
+            "\nSend coins to be burnt (destroyed) onto the Dynamic Network\n"
             "\nArguments:\n"
-            "1. \"dynamicaddress\"  (string, required) The dynamic address to mint the coins toward.\n"
-            "2. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
+            "1. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
             "\nExamples:\n"
-            + HelpExampleCli("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
-            + HelpExampleRpc("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
+            + HelpExampleCli("burndynamic", "123.456")
+            + HelpExampleRpc("burndynamic", "123.456")
         );
 
-    EnsureWalletIsUnlocked();
+    EnsureWalletIsUnlocked();   
+	
+	CAmount nAmount = AmountFromValue(params[0]);
+	
+	if (nAmount <= 0)
+		throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for destruction");
     
-    CDynamicAddress address(params[0].get_str());
-    if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Dynamic address");
-    
-    CAmount nAmount = AmountFromValue(params[1]);
-    if (nAmount <= fluidMintingMinimum || nAmount >= fluidMintingMaximum)
-        throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send, outside bounds");
-    
-	if (!InitiateFluidVerify(sovreignAddress))
-		throw JSONRPCError(RPC_TYPE_ERROR, "Attempting Illegal Operation - Credentials Absent!");
-		    
-    finalScript = AssimilateMintingScript(address, nAmount);
-    
-    if (!VerifyInstruction(ScriptToAsmStr(finalScript)))
-		throw JSONRPCError(RPC_TYPE_ERROR, "Unknown Malformation! Script Unverifiable");
-    
-	CWalletTx wtx;
-    SendMintTransaction(finalScript, wtx);
+    SendCustomTransaction(fluid.AssimiliateDestroyScript(nAmount), wtx, nAmount);
 
     return wtx.GetHash().GetHex();
 }
-*/

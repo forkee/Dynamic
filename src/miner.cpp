@@ -406,12 +406,12 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 		CAmount fluidIssuance;
 		CBlock previousBlock;
 		bool areWeMinting = false;
-		bool isItUsable = DerivePreviousBlockInformation(previousBlock, pindexPrev);
+		bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindexPrev);
 		CAmount blockReward = GetPoWBlockPayment(nHeight, nFees);
 
         // Compute regular coinbase transaction.
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        if (GetMintingInstructions(previousBlock, validationState, address, fluidIssuance) && isItUsable) {
+        if (fluid.GetMintingInstructions(previousBlock, validationState, address, fluidIssuance) && isItUsable) {
 			txNew.vout[0].nValue = blockReward + fluidIssuance;
 			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
 			areWeMinting = true;

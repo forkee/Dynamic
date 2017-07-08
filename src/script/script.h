@@ -667,6 +667,7 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
+    // TODO: Consolodate!
     bool IsUnspendable() const
     {
         return (size() > 0 && *begin() == OP_RETURN);
@@ -675,6 +676,11 @@ public:
 	bool IsMintInstruction() const
     {
         return (size() > 0 && *begin() == OP_MINT);
+    }
+    
+	bool IsDestroyScript() const
+    {
+        return (size() > 0 && *begin() == OP_DESTROY);
     }
 
     void clear()
