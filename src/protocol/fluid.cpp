@@ -43,7 +43,7 @@ extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CA
 Fluid fluid;
 
 CAmount Fluid::DeriveSupplyPercentage(int64_t percentage) {
-	int64_t supply = chainActive.Tip()->nMoneySupply;
+	int64_t supply = 100000*COIN;//chainActive.Tip()->nMoneySupply;
 	return supply * percentage / 100;
 }
 
@@ -85,6 +85,29 @@ bool Fluid::InitiateFluidVerify(CDynamicAddress dynamicAddress) {
 	// Wallet cannot be accessed, cannot continue ahead!
     return false;
 #endif
+}
+
+bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
+    uint256 hash = fromDerive->GetBlockHash();
+
+    if (mapBlockIndex.count(hash) == 0) {
+      	LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
+        return false;
+    }
+    
+    CBlockIndex* pblockindex = mapBlockIndex[hash];
+
+    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
+        return false;
+	}
+    
+    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
+        return false;
+	}
+	
+    return true;
 }
 
 bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
@@ -243,39 +266,6 @@ bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state,
 	}
 	return false;
 }
-/*
-void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed) {
-    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
-		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
-			if (txout.scriptPubKey.IsDestroyScript()) {
-				DeriveDestructionInformation(ScriptToAsmStr(txout.scriptPubKey), amountDestroyed);
-			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
-		}
-	}
-}
-*/
-bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive) {
-    uint256 hash = fromDerive->GetBlockHash();
-
-    if (mapBlockIndex.count(hash) == 0) {
-      	LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
-        return false;
-    }
-    
-    CBlockIndex* pblockindex = mapBlockIndex[hash];
-
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
-		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
-        return false;
-	}
-    
-    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
-        return false;
-	}
-	
-    return true;
-}
 
 UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
 {
@@ -323,6 +313,42 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
     SendCustomTransaction(finalScript, wtx);
 
     return wtx.GetHash().GetHex();
+}
+
+bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount &coinsDestroyed) {
+	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
+	std::vector<std::string> transverser;
+	boost::split(transverser, scriptString, boost::is_any_of(" "));
+	scriptString = transverser.at(1);
+	
+	// Step 1.2: Convert new Hex Data to dehexed amount
+	std::string dehexString = HexToString(scriptString);
+	scriptString = dehexString;
+	
+	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
+	std::string lr = scriptString; std::string::iterator end_pos = std::remove(lr.begin(), lr.end(), ' '); lr.erase(end_pos, lr.end());
+	
+	try {
+		coinsDestroyed			= boost::lexical_cast<int64_t>(lr);
+	}
+	catch( boost::bad_lexical_cast const& ) {
+		LogPrintf("Fluid::ParseDestructionAmount: Coins destroyed amount is invalid!\n");
+		return false;
+	}
+	
+	return true;
+}
+
+void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed) {
+	CAmount parseToDestroy;
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsDestroyScript()) {
+				ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), parseToDestroy);
+				amountDestroyed += parseToDestroy;
+			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
+		}
+	}
 }
 
 UniValue burndynamic(const UniValue& params, bool fHelp)

@@ -106,16 +106,18 @@ public:
 	
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);
-
+	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
+	
 	bool GenerateFluidToken(CDynamicAddress sendToward, 
 							CAmount tokenMintAmt, std::string &issuanceString);
-
 	bool VerifyInstruction(std::string uniqueIdentifier);					
+	
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
-	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
+	bool ParseDestructionAmount(std::string scriptString, CAmount &coinsDestroyed);
+
 	bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
-	// void GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
-	// bool GetDestroyQuantity(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
+	void GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
+
 };
 
 extern Fluid fluid;
