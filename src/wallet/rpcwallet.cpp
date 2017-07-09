@@ -468,7 +468,7 @@ void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fS
         throw runtime_error("DYNAMIC_RPC_ERROR ERRCODE: 9000 - " + _("The Dynamic identity you are trying to use for this transaction is invalid or has been updated and not confirmed yet! Please wait a block and try again..."));
 }
 
-void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CAmount nValue = (1*COIN))
+void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CAmount nValue = COIN)
 {
 	bool fSubtractFeeFromAmount = false;
     CAmount curBalance = pwalletMain->GetBalance();

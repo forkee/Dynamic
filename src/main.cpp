@@ -3094,7 +3094,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 	CBlock previousBlock;
 	CDynamicAddress addressX;
 	CValidationState validationState;
-	CAmount nExpectedBlockValue, fluidIssuance;
+	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt;
 	std::string strError = "";
 
 	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindex->pprev); // We need the entire previous block to check!
@@ -3104,17 +3104,23 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 		nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
 	}
 	
-    if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError) && !isItUsable) {
-		return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
-    }
-
+	if (isItUsable) {
+		if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)) {
+			return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
+		}
+	}
+    
     if (!IsBlockPayeeValid(block.vtx[0], pindex->nHeight, nExpectedBlockValue)) {
         mapRejectedBlocks.insert(std::make_pair(block.GetHash(), GetTime()));
         return state.DoS(0, error("ConnectBlock(DYN): couldn't find Dynode or Superblock payments"),
                                 REJECT_INVALID, "bad-cb-payee");
     }
     
-   	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
+    // Get Destruction Transactions on the Network
+    fluid.GetDestructionTxes(previousBlock, validationState, dynamicBurnt);
+   	
+   	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + (nValueOut - nValueIn) - dynamicBurnt;
+   	pindex->nDynamicBurnt = (pindex->pprev? pindex->pprev->nDynamicBurnt : 0) + dynamicBurnt;
 
     // END DYNAMIC
 

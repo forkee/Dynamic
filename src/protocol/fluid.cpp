@@ -344,7 +344,7 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	return true;
 }
 
-void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed) {
+void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed = 0) {
 	CAmount parseToDestroy;
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {

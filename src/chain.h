@@ -151,6 +151,7 @@ public:
     unsigned int nBits;
     unsigned int nNonce;
 	CAmount nMoneySupply;
+	CAmount nDynamicBurnt;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
@@ -170,6 +171,7 @@ public:
         nStatus = 0;
         nSequenceId = 0;
 		nMoneySupply = 0;
+		nDynamicBurnt = 0;
 
         nVersion       = 0;
         hashMerkleRoot = uint256();
@@ -334,6 +336,7 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(nMoneySupply);
+		READWRITE(nDynamicBurnt);
     }
 
     uint256 GetBlockHash() const
