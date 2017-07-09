@@ -20,6 +20,10 @@ static int64_t nTimeOffset = 0;
 extern int64_t nNtpOffset;
 static int64_t nNodesOffset = std::numeric_limits<int64_t>::max();
 
+int64_t GetNodesOffset() {
+	return nNodesOffset;
+}
+
 /**
  * "Never go to sea with two chronometers; take one or three."
  * Our three time sources are:
