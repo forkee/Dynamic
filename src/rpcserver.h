@@ -181,7 +181,7 @@ extern UniValue getaddressutxos(const UniValue& params, bool fHelp);
 extern UniValue getaddressdeltas(const UniValue& params, bool fHelp);
 extern UniValue getaddresstxids(const UniValue& params, bool fHelp);
 extern UniValue getaddressbalance(const UniValue& params, bool fHelp);
-
+extern UniValue ntptime(const UniValue& params, bool fHelp);
 extern UniValue getpeerinfo(const UniValue& params, bool fHelp);
 extern UniValue ping(const UniValue& params, bool fHelp);
 extern UniValue addnode(const UniValue& params, bool fHelp);
@@ -201,6 +201,7 @@ extern UniValue dumphdinfo(const UniValue& params, bool fHelp);
 extern UniValue importwallet(const UniValue& params, bool fHelp);
 
 // START_DYNAMIC service rpc functions
+
 extern UniValue identitynew(const UniValue& params, bool fHelp);
 extern UniValue identityupdate(const UniValue& params, bool fHelp);
 extern UniValue identitylist(const UniValue& params, bool fHelp);
@@ -237,7 +238,7 @@ extern UniValue certfilter(const UniValue& params, bool fHelp);
 
 extern UniValue escrownew(const UniValue& params, bool fHelp);
 extern UniValue escrowrelease(const UniValue& params, bool fHelp);
-extern UniValue escrowcomplete(const UniValue& params, bool fHelp);
+// extern UniValue escrowcomplete(const UniValue& params, bool fHelp);
 extern UniValue escrowclaimrelease(const UniValue& params, bool fHelp);
 extern UniValue escrowrefund(const UniValue& params, bool fHelp);
 extern UniValue escrowclaimrefund(const UniValue& params, bool fHelp);
@@ -248,9 +249,9 @@ extern UniValue escrowfilter(const UniValue& params, bool fHelp);
 
 extern UniValue messagenew(const UniValue& params, bool fHelp);
 extern UniValue messageinfo(const UniValue& params, bool fHelp);
-extern UniValue messagelist(const UniValue& params, bool fHelp);
+// extern UniValue messagelist(const UniValue& params, bool fHelp);
 extern UniValue messagesentlist(const UniValue& params, bool fHelp);
-extern UniValue messagehistory(const UniValue& params, bool fHelp);
+// extern UniValue messagehistory(const UniValue& params, bool fHelp);
 
 // END_DYNAMIC service rpc functions
 
@@ -262,6 +263,7 @@ extern UniValue getnetworkhashps(const UniValue& params, bool fHelp);
 extern UniValue gethashespersec(const UniValue& params, bool fHelp);
 extern UniValue getmininginfo(const UniValue& params, bool fHelp);
 extern UniValue getpowrewardstart(const UniValue& params, bool fHelp);
+extern UniValue getmoneysupply(const UniValue& params, bool fHelp);
 extern UniValue prioritisetransaction(const UniValue& params, bool fHelp);
 extern UniValue getblocktemplate(const UniValue& params, bool fHelp);
 extern UniValue submitblock(const UniValue& params, bool fHelp);
@@ -359,7 +361,8 @@ extern UniValue invalidateblock(const UniValue& params, bool fHelp);
 extern UniValue reconsiderblock(const UniValue& params, bool fHelp);
 extern UniValue getspentinfo(const UniValue& params, bool fHelp);
 
-extern UniValue generatefluidissuetoken(const UniValue& params, bool fHelp);
+extern UniValue mintdynamic(const UniValue& params, bool fHelp); // in protocol/fluid.cpp
+extern UniValue burndynamic(const UniValue& params, bool fHelp);
 
 bool StartRPC();
 void InterruptRPC();

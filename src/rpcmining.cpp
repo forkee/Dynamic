@@ -1153,3 +1153,30 @@ UniValue estimatesmartpriority(const UniValue& params, bool fHelp)
     result.push_back(Pair("blocks", answerFound));
     return result;
 }
+
+double GetMoneySupply(bool fBurnt)
+{
+	double nSupply = 0;
+	
+    CBlockIndex* pindex = chainActive.Tip();
+    if (fBurnt) { nSupply = pindex->nDynamicBurnt; } 
+		   else { nSupply = pindex->nMoneySupply; }
+    
+    return nSupply / COIN;  
+}
+
+UniValue getmoneysupply(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+            "getmoneysupply \n"
+            "Returns the current total money in circulation and the total of coins burned");
+    
+    GetLastBlockIndex(chainActive.Tip());
+
+    UniValue obj(UniValue::VOBJ);
+    obj.push_back(Pair("moneysupply", GetMoneySupply(false)));
+    obj.push_back(Pair("burntsupply", GetMoneySupply(true)));
+
+    return obj;
+}

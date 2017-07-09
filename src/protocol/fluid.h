@@ -99,25 +99,37 @@ public:
 		else return CScript() << OP_MINT << ParseHex(issuanceString);
 	}
 	
+	CScript AssimilateKillScript() {
+		std::string killToken;
+		if(!GenerateKillToken(killToken))
+			return CScript() << OP_RETURN;
+		else return CScript() << OP_KILL << ParseHex(killToken);
+	}
+	
 	CScript AssimiliateDestroyScript(int64_t howMuch) {
-		std::string r = boost::lexical_cast<std::string>(howMuch); ConvertToHex(r);
+		std::ostringstream oss; oss << howMuch; std::string r = oss.str(); 
+		ConvertToHex(r);
 		return CScript() << OP_DESTROY << ParseHex(r);
 	}
 	
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);
+	
 	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
+	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
 	
 	bool GenerateFluidToken(CDynamicAddress sendToward, 
 							CAmount tokenMintAmt, std::string &issuanceString);
-	bool VerifyInstruction(std::string uniqueIdentifier);					
+	bool VerifyInstruction(std::string uniqueIdentifier);
 	
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
 	bool ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed);
 
 	bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
 	void GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);
-
+	
+	bool GenerateKillToken(std::string &killString);
+	bool GetKillRequest(const CBlock& block, CValidationState& state);
 };
 
 extern Fluid fluid;

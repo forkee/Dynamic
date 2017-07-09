@@ -110,6 +110,29 @@ bool Fluid::DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDeriv
     return true;
 }
 
+bool Fluid::DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive) {
+    uint256 hash = fromDerive->GetBlockHash();
+
+    if (mapBlockIndex.count(hash) == 0) {
+      	LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
+        return false;
+    }
+    
+    CBlockIndex* pblockindex = mapBlockIndex[hash];
+
+    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
+        return false;
+	}
+    
+    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
+		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
+        return false;
+	}
+	
+    return true;
+}
+
 bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
 						CAmount tokenMintAmt, std::string &issuanceString) {
 	
@@ -230,7 +253,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	std::string ls = ptrs.at(2); std::string::iterator end_posX = std::remove(ls.begin(), ls.end(), ' '); ls.erase(end_posX, ls.end());
 	
 	try {
-		coinAmount			 	= boost::lexical_cast<int64_t>(lr);
+		coinAmount			 	= boost::lexical_cast<CAmount>(lr);
 		issuanceTime 			= boost::lexical_cast<int64_t>(ls);
 	}
 	catch( boost::bad_lexical_cast const& ) {
@@ -241,8 +264,9 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	std::string recipientAddress = ptrs.at(4);
 	destination.SetString(recipientAddress);
 	
-	if (GetTime() + 15 * 60 > issuanceTime || GetTime() - 15 * 60 < issuanceTime)
+	/* if (GetTime() + 15 * 60 > issuanceTime || GetTime() - 15 * 60 < issuanceTime)
 		return false;
+	*/
 		
 	if(!destination.IsValid() || coinAmount < fluidMintingMinimum || coinAmount > fluidMintingMaximum)
 		return false;
@@ -257,9 +281,9 @@ bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state,
 				if (!VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
 					LogPrintf("Fluid::GetMintingInstructions: FAILED instruction verification!\n");
 				else {
-					if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey)))
+					if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
 						LogPrintf("Fluid::GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
-					else return true; // Sweet, sweet minting!
+					} else return true;
 				} 
 			} else { LogPrintf("Fluid::GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
@@ -267,7 +291,7 @@ bool Fluid::GetMintingInstructions(const CBlock& block, CValidationState& state,
 	return false;
 }
 
-UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
+UniValue mintdynamic(const UniValue& params, bool fHelp)
 {
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 	
@@ -279,14 +303,14 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
     
     if (fHelp || params.size() != 2)
         throw std::runtime_error(
-            "generatefluidissuetoken \"dynamicaddress\" \"amount\"\n"
+            "mintdynamic \"dynamicaddress\" \"amount\"\n"
             "\Generate Fluid Issuance Token that can be broadcasted by the network\n"
             "\nArguments:\n"
             "1. \"dynamicaddress\"  (string, required) The dynamic address to mint the coins toward.\n"
             "2. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
             "\nExamples:\n"
-            + HelpExampleCli("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
-            + HelpExampleRpc("generatefluidissuetoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
+            + HelpExampleCli("mintdynamic", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"123.456\"")
+            + HelpExampleRpc("mintdynamic", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"123.456\"")
         );
 
     EnsureWalletIsUnlocked();
@@ -316,7 +340,7 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
 }
 
 bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
-	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
+	// Step 1: Make sense out of ASM ScriptKey, split OP_DESTROY from Hex
 	std::vector<std::string> transverser;
 	boost::split(transverser, scriptString, boost::is_any_of(" "));
 	scriptString = transverser.at(1);
@@ -344,12 +368,13 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	return true;
 }
 
-void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed = 0) {
-	CAmount parseToDestroy;
+void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed) {
+	CAmount parseToDestroy = 0;
+	amountDestroyed = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsDestroyScript()) {
-				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), parseToDestroy)) {
+				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, parseToDestroy)) {
 					amountDestroyed += parseToDestroy; // This is what metric we need to get
 				}
 			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
@@ -366,7 +391,7 @@ UniValue burndynamic(const UniValue& params, bool fHelp)
     
     if (fHelp || params.size() != 1)
         throw std::runtime_error(
-            "generatefluidissuetoken \"amount\"\n"
+            "burndynamic \"amount\"\n"
             "\nSend coins to be burnt (destroyed) onto the Dynamic Network\n"
             "\nArguments:\n"
             "1. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
@@ -385,4 +410,48 @@ UniValue burndynamic(const UniValue& params, bool fHelp)
     SendCustomTransaction(fluid.AssimiliateDestroyScript(nAmount), wtx, nAmount);
 
     return wtx.GetHash().GetHex();
+}
+
+
+bool Fluid::GenerateKillToken(std::string &killString) {
+	
+	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
+		
+	std::string unsignedMessage;
+	unsignedMessage = std::to_string(GetTime());
+	
+	CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic;
+    ss << unsignedMessage;
+    
+   	CDynamicAddress addr(sovreignAddress);
+
+    CKeyID keyID;
+    if (!addr.GetKeyID(keyID))
+		return false;
+
+	CKey key;
+    if (!pwalletMain->GetKey(keyID, key))
+		return false;
+
+    std::vector<unsigned char> vchSig;
+    if (!key.SignCompact(ss.GetHash(), vchSig))
+		return false;
+	else
+		killString = unsignedMessage + " " + EncodeBase64(&vchSig[0], vchSig.size());
+			
+	ConvertToHex(killString);
+		
+    return true;
+}
+
+bool Fluid::GetKillRequest(const CBlock& block, CValidationState& state) {
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsKillScript()) {
+					return VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey));
+			}
+		}
+	}
+	return false;
 }

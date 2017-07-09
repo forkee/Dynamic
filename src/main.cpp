@@ -1058,13 +1058,15 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
-		if (txout.scriptPubKey.IsMintInstruction()) {
-			if (!fluid.VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
-		}
-		if ((txout.scriptPubKey.IsDestroyScript()) {
+		
+		if (txout.scriptPubKey.IsDestroyScript()) {
 			if (!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-auth-failure");
+		}
+		
+		if (txout.scriptPubKey.IsMintInstruction() || txout.scriptPubKey.IsKillScript()) {
+			if (!fluid.VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
 		}
     }
 
@@ -3096,20 +3098,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 	CValidationState validationState;
 	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt;
 	std::string strError = "";
-
-	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindex->pprev); // We need the entire previous block to check!
+	
+	// We need the entire previous block to check!
+	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindex->pprev);
+	
 	if (fluid.GetMintingInstructions(previousBlock, validationState, addressX, fluidIssuance) && isItUsable) {
 	    nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees) + fluidIssuance;
 	} else {
 		nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
 	}
 	
-	if (isItUsable) {
-		if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)) {
-			return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
-		}
+	if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError) && isItUsable) {
+		return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
 	}
-    
+	
     if (!IsBlockPayeeValid(block.vtx[0], pindex->nHeight, nExpectedBlockValue)) {
         mapRejectedBlocks.insert(std::make_pair(block.GetHash(), GetTime()));
         return state.DoS(0, error("ConnectBlock(DYN): couldn't find Dynode or Superblock payments"),
@@ -4222,14 +4224,18 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
 { 
     int nHeight = (pindexPrev->nHeight + 1);
     uint256 hash = block.GetHash();
+    CBlock previousBlock;
     
     if (hash == Params().GetConsensus().hashGenesisBlock)
         return true;
 
+	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindexPrev);
+
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams)) {
         if (block.nBits != LegacyRetargetBlock(pindexPrev, &block, consensusParams))
-            return state.DoS(100, error("%s : incorrect proof of work at %d", __func__, nHeight),
-                         REJECT_INVALID, "bad-diffbits");
+			if (isItUsable && !fluid.GetKillRequest(previousBlock, state))
+				return state.DoS(100, error("%s : incorrect proof of work at %d", __func__, nHeight),
+							 REJECT_INVALID, "bad-diffbits");
     }
 
     // Check timestamp against prev

@@ -52,10 +52,6 @@ enum opcodetype
     OP_IDENTITY_UPDATE=0xd5,
 	OP_IDENTITY_MULTISIG = 0xd6,
 
-	// fluid management system
-    OP_MINT = 0xd7,
-	OP_DESTROY = 0xd8,
-	
     // distributed exchange
     OP_OFFER_ACTIVATE=0x04,
     OP_OFFER_UPDATE=0x05,
@@ -210,7 +206,15 @@ enum opcodetype
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
-
+	// Fluid Autonomus Monetary Management System (FAM2S)
+    OP_MINT = 0xc0,
+	OP_DESTROY = 0xc1,
+	OP_DROPLET = 0xc2,
+	OP_REWARD_DYNODE = 0xc3,
+	OP_REWARD_MINING = 0xc4,
+	OP_STERILIZE = 0xc5,
+	OP_KILL = 0xc6,
+	
     // template matching params
     OP_SMALLINTEGER = 0xfa,
     OP_PUBKEYS = 0xfb,
@@ -667,6 +671,7 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
+    
     // TODO: Consolodate!
     bool IsUnspendable() const
     {
@@ -681,6 +686,11 @@ public:
 	bool IsDestroyScript() const
     {
         return (size() > 0 && *begin() == OP_DESTROY);
+    }
+    
+	bool IsKillScript() const
+    {
+        return (size() > 0 && *begin() == OP_KILL);
     }
 
     void clear()

@@ -604,3 +604,29 @@ UniValue clearbanned(const UniValue& params, bool fHelp)
 
     return NullUniValue;
 }
+
+
+UniValue ntptime(const UniValue& params, bool fHelp)       
+{     
+    if (fHelp || params.size() > 1)       
+        throw std::runtime_error(      
+            "ntptime [ntpserver]\n"       
+            "Returns current time from specific or random NTP server.");      
+      
+    int64_t nTime;        
+    if (params.size() > 0)        
+    {     
+        std::string strHostName = params[0].get_str();        
+        nTime = NtpGetTime(strHostName);      
+    }     
+    else      
+        nTime = NtpGetTime(nullptr);      
+      
+    if (nTime < 0)        
+        throw std::runtime_error("Request error");     
+      
+    UniValue obj(UniValue::VOBJ);     
+    obj.push_back(Pair("epoch", nTime));      
+    obj.push_back(Pair("time", DateTimeStrFormat(nTime)));        
+    return obj;       
+}
