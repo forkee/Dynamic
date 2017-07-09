@@ -70,7 +70,7 @@ endif
 .PHONY: FORCE check-symbols check-security
 # dynamic #
 DYNAMIC_CORE_H = \
-  ntp.h \
+  protocol/ntp.h \
   protocol/identity.h \
   protocol/cert.h \
   protocol/escrow.h \
@@ -79,6 +79,9 @@ DYNAMIC_CORE_H = \
   protocol/message.h \
   protocol/offer.h \
   protocol/fluid.h \
+  protocol/blackwater.h \
+  protocol/checkpointsync.h \
+  protocol/duality.h \
   activedynode.h \
   addressindex.h \
   spentindex.h \
@@ -215,7 +218,7 @@ libdynamic_util_a-clientversion.$(OBJEXT): obj/build.h
 libdynamic_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libdynamic_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_server_a_SOURCES = \
-  ntp.cpp \
+  protocol/ntp.cpp \
   protocol/identity.cpp \
   protocol/cert.cpp \
   protocol/escrow.cpp \
@@ -223,6 +226,9 @@ libdynamic_server_a_SOURCES = \
   protocol/messagecrypter.cpp \
   protocol/offer.cpp \
   protocol/fluid.cpp \
+  protocol/blackwater.cpp \
+  protocol/checkpointsync.cpp \
+  protocol/duality.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \

@@ -18,6 +18,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "version.h"
+#include "ntp.h"
 
 #include <univalue.h>
 
@@ -605,7 +606,6 @@ UniValue clearbanned(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-
 UniValue ntptime(const UniValue& params, bool fHelp)       
 {     
     if (fHelp || params.size() > 1)       
@@ -627,6 +627,6 @@ UniValue ntptime(const UniValue& params, bool fHelp)
       
     UniValue obj(UniValue::VOBJ);     
     obj.push_back(Pair("epoch", nTime));      
-    obj.push_back(Pair("time", DateTimeStrFormat(nTime)));        
+    obj.push_back(Pair("time", DurationToDHMS(nTime)));        
     return obj;       
 }

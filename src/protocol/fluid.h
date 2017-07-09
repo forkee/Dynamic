@@ -1,6 +1,8 @@
 /**
  * Copyright 2017 Everybody and Nobody (Empinel/Plaxton)
  * 
+ * This file is a portion of the DynamicX Protocol
+ * 
  * Permission is hereby granted, free of charge, to any person 
  * obtaining a copy of this software and associated documentation files 
  * (the "Software"), to deal in the Software without restriction, including 
@@ -20,6 +22,9 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef FLUID_PROTOCOL_H
+#define FLUID_PROTOCOL_H
+
 #include "base58.h"
 #include "amount.h"
 #include "chain.h"
@@ -36,7 +41,7 @@ class CBlock;
 class CBlockTemplate;
 
 //
-// Ideal Script Formation Example:
+// Ideal Mintage Script Formation Example:
 //
 // OP_MINT 3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773
 //         82b41426a39536b62656a6b47754773536a69556c6b6c616832514b314a676258525642613379515a33785a586b5249632f6633526951526458794552724a36595979764c306b
@@ -133,3 +138,6 @@ public:
 };
 
 extern Fluid fluid;
+
+#endif // FLUID_PROTOCOL_H
+
