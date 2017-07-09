@@ -113,7 +113,7 @@ public:
 	bool VerifyInstruction(std::string uniqueIdentifier);					
 	
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
-	bool ParseDestructionAmount(std::string scriptString, CAmount &coinsDestroyed);
+	bool ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed);
 
 	bool GetMintingInstructions(const CBlock& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
 	void GetDestructionTxes(const CBlock& block, CValidationState& state, CAmount &amountDestroyed);

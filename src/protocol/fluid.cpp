@@ -315,7 +315,7 @@ UniValue generatefluidissuetoken(const UniValue& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
-bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount &coinsDestroyed) {
+bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::vector<std::string> transverser;
 	boost::split(transverser, scriptString, boost::is_any_of(" "));
@@ -336,6 +336,11 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount &coinsDestr
 		return false;
 	}
 	
+	if (coinsSpent != coinsDestroyed) {
+		LogPrintf("Fluid::ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy!\n");
+		return false;
+	}
+	
 	return true;
 }
 
@@ -344,8 +349,9 @@ void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAm
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsDestroyScript()) {
-				ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), parseToDestroy);
-				amountDestroyed += parseToDestroy;
+				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), parseToDestroy)) {
+					amountDestroyed += parseToDestroy; // This is what metric we need to get
+				}
 			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
 	}

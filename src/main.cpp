@@ -1048,7 +1048,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
     // Check for negative or overflow output values
-    CAmount nValueOut = 0;
+    CAmount nValueOut = 0, nCoinsBurn = 0;
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
         if (txout.nValue < 0)
@@ -1060,7 +1060,11 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 		if (txout.scriptPubKey.IsMintInstruction()) {
 			if (!fluid.VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
+		}
+		if ((txout.scriptPubKey.IsDestroyScript()) {
+			if (!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-auth-failure");
 		}
     }
 
@@ -3109,6 +3113,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return state.DoS(0, error("ConnectBlock(DYN): couldn't find Dynode or Superblock payments"),
                                 REJECT_INVALID, "bad-cb-payee");
     }
+    
+   	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
+
     // END DYNAMIC
 
     if (!control.Wait())
@@ -3123,7 +3130,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Dynamic: collect valid name tx
     // NOTE: tx.UpdateCoins should not affect this loop, probably...
     std::vector<CAmount> vFees (block.vtx.size(), 0);
-	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
