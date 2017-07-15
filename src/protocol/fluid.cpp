@@ -226,8 +226,7 @@ bool Fluid::VerifyInstruction(std::string uniqueIdentifier)
 }
 
 bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
-
-	int64_t issuanceTime;
+	// int64_t issuanceTime;
 	
 	// Step 0: Check if token is even valid
 	if (!VerifyInstruction(uniqueIdentifier)) {
@@ -256,7 +255,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	
 	try {
 		coinAmount			 	= boost::lexical_cast<CAmount>(lr);
-		issuanceTime 			= boost::lexical_cast<int64_t>(ls);
+		//issuanceTime 			= boost::lexical_cast<int64_t>(ls);
 	}
 	catch( boost::bad_lexical_cast const& ) {
 		LogPrintf("Fluid::ParseMintKey: Either amount string or issuance time string are incorrect! Parsing cannot continue!\n");
@@ -414,7 +413,6 @@ UniValue burndynamic(const UniValue& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
-
 bool Fluid::GenerateKillToken(std::string &killString) {
 	
 	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
@@ -455,5 +453,9 @@ bool Fluid::GetKillRequest(const CBlock& block, CValidationState& state) {
 			}
 		}
 	}
+	return false;
+}
+
+bool DeriveBlockInfoFromHash(CBlock &block, uint256 prevBlock) {
 	return false;
 }

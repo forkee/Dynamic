@@ -346,7 +346,66 @@ crypto_libdynamic_crypto_a_SOURCES = \
 	crypto/sha256.cpp \
 	crypto/sha256.h \
 	crypto/sha512.cpp \
-	crypto/sha512.h
+	crypto/sha512.h \
+	protocol/libs/aes_helper.c \
+	protocol/libs/sha3nist.h \
+	protocol/libs/blake.c \
+	protocol/libs/sph_blake.h \
+	protocol/libs/bmw.c \
+	protocol/libs/sph_bmw.h \
+	protocol/libs/cubehash.c \
+	protocol/libs/sph_cubehash.h \
+	protocol/libs/echo.c \
+	protocol/libs/sph_echo.h \
+	protocol/libs/fugue.c \
+	protocol/libs/sph_fugue.h \
+	protocol/libs/groestl.c \
+	protocol/libs/sph_groestl.h \
+	protocol/libs/hamsi.c \
+	protocol/libs/sph_hamsi.h \
+	protocol/libs/haval.c \
+	protocol/libs/sph_haval.h \
+	protocol/libs/jh.c \
+	protocol/libs/sph_jh.h \
+	protocol/libs/keccak.c \
+	protocol/libs/sph_keccak.h \
+	protocol/libs/luffa.c \
+	protocol/libs/sph_luffa.h \
+	protocol/libs/md2.c \
+	protocol/libs/sph_md2.h \
+	protocol/libs/md4.c \
+	protocol/libs/sph_md4.h \
+	protocol/libs/md5.c \
+	protocol/libs/sph_md5.h \
+	protocol/libs/panama.c \
+	protocol/libs/sph_panama.h \
+	protocol/libs/radiogatun.c \
+	protocol/libs/sph_radiogatun.h \
+	protocol/libs/ripemd.c \
+	protocol/libs/sph_ripemd.h \
+	protocol/libs/sha0.c \
+	protocol/libs/sph_sha0.h \
+	protocol/libs/sha1.c \
+	protocol/libs/sph_sha1.h \
+	protocol/libs/sha2big.c \
+	protocol/libs/sha2.c \
+	protocol/libs/sph_sha2.h \
+	protocol/libs/sha3nist.c \
+	protocol/libs/sph_sha3.h \
+	protocol/libs/shabal.c \
+	protocol/libs/sph_shabal.h \
+	protocol/libs/shavite.c \
+	protocol/libs/sph_shavite.h \
+	protocol/libs/simd.c \
+	protocol/libs/sph_simd.h \
+	protocol/libs/speed.c \
+	protocol/libs/skein.c \
+	protocol/libs/sph_skein.h \
+	protocol/libs/tiger.c \
+	protocol/libs/sph_tiger.h \
+	protocol/libs/sph_types.h \
+	protocol/libs/whirlpool.c \
+	protocol/libs/sph_whirlpool.h
 
 # common: shared between dynamicd, and dynamic-qt and non-server tools
 libdynamic_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)

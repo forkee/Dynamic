@@ -60,6 +60,25 @@ std::string BlackWater::GetSerializedBlockData(CBlock block) {
 	return strHex;
 }
 
+uint256 BlackWater::CombineHashes(uint256 hash1, uint256 hash2, uint256 hash3, uint256 hash4)
+{
+    uint256 mask = uint256("0x8000000000000000000000000000000000000000000000000000000000000000");
+    uint256 hash[4] = { hash1, hash2, hash3, hash4 };
+
+    /* Transpose first 64 bits of each hash into final */
+    uint256 final = 0;
+    for (unsigned int i = 0; i < 64; i++) {
+        for (unsigned int j = 0; j < 4; j++) {
+            final <<= 1;
+            if ((hash[j] & mask) != 0)
+                final |= 1;
+        }
+        mask >>= 1;
+    }
+
+    return final;
+}
+
 uint256 BlackWater::PointBlankHashing(const void* input, bool versionTwo) {
 	// Step One: Generate Standard Argon2d Block Hash
 	uint256 initialHash, hashOutput;
@@ -79,7 +98,7 @@ uint256 BlackWater::PointBlankHashing(const void* input, bool versionTwo) {
 	}
 
 	// Step Three: Generate Random Seed from derived block
-    std::string cseed_str = blockFromHash->GetBlockHash().GetHex(); // Get Hex from Hash from our block
+    std::string cseed_str = blockFromHash.GetBlockHash().GetHex(); // Get Hex from Hash from our block
     const char* cseed = cseed_str.c_str(); // Convert
     long seed = hex2long(cseed); // Convert
 
@@ -88,14 +107,14 @@ uint256 BlackWater::PointBlankHashing(const void* input, bool versionTwo) {
 	std::string serializeToken;
 
 	for (int r = 0; r > 25; r++) {
-		nRandomHeight = generateMTRandom(seed, blockFromHash->nHeight); // First get random block
+		nRandomHeight = generateMTRandom(seed, blockFromHash.nHeight); // First get random block
 		algoSeed = generateMTRandom(nRandomHeight, 15); 				// Then get random algorithm for hashing
 		CBlockIndex* pRandomIndex = chainActive[nRandomHeight];			// Get block index for selected height
 		DerivePreviousBlockInformation(concernedBlock, pRandomIndex);	// Get complete block
 		serializeToken += GetSerializedBlockData(concernedBlock);		// Get serialized information of the block and append to string
 		PointBlankRoulette(serializeToken, nRandomHeight, algoSeed);	// Hash the token using randomized sph-lib function which will modify token
 		{
-			pRandomIndex.SetNull();
+			pRandomIndex->SetNull();
 			concernedBlock.SetNull();
 			nRandomHeight = 0, algoSeed = 0;
 		}	// Set all parameters to NULL to ensure that token isn't contaminated
