@@ -80,7 +80,6 @@ DYNAMIC_CORE_H = \
   protocol/offer.h \
   protocol/fluid.h \
   protocol/blackwater.h \
-  protocol/checkpointsync.h \
   protocol/duality.h \
   activedynode.h \
   addressindex.h \
@@ -227,7 +226,6 @@ libdynamic_server_a_SOURCES = \
   protocol/offer.cpp \
   protocol/fluid.cpp \
   protocol/blackwater.cpp \
-  protocol/checkpointsync.cpp \
   protocol/duality.cpp \
   addrman.cpp \
   alert.cpp \

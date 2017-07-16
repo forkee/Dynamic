@@ -47,6 +47,7 @@
 #include "versionbits.h"
 #include "checkforks.h"
 #include "protocol/fluid.h"
+#include "protocol/duality.h"
 
 #include "protocol/identity.h"
 #include "protocol/offer.h"
@@ -1900,43 +1901,6 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
     return ReadBlockFromDisk(block, pindex, Params().GetConsensus());
 }
 
-CAmount GetPoWBlockPayment(const int& nHeight, CAmount nFees)
-{
-    if (chainActive.Height() == 0) {
-        CAmount nSubsidy = 4000000 * COIN;
-        LogPrint("superblock creation", "GetPoWBlockPayment() : create=%s nSubsidy=%d\n", FormatMoney(nSubsidy), nSubsidy);
-        return nSubsidy;
-    }
-    else if (chainActive.Height() >= 1 && chainActive.Height() <= Params().GetConsensus().nRewardsStart) {
-        LogPrint("zero-reward block creation", "GetPoWBlockPayment() : create=%s nSubsidy=%d\n", FormatMoney(BLOCKCHAIN_INIT_REWARD), BLOCKCHAIN_INIT_REWARD);
-        return BLOCKCHAIN_INIT_REWARD + nFees;
-    }
-    else if (chainActive.Height() > Params().GetConsensus().nRewardsStart) {
-        LogPrint("creation", "GetPoWBlockPayment() : create=%s PoW Reward=%d\n", FormatMoney(PHASE_1_POW_REWARD), PHASE_1_POW_REWARD);
-        return PHASE_1_POW_REWARD + nFees; // 1 DYN
-    }
-    else 
-        return BLOCKCHAIN_INIT_REWARD + nFees;
-}
-
-CAmount GetDynodePayment(bool fDynode)
-{   
-    if (fDynode && chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && chainActive.Height() < Params().GetConsensus().nUpdateDiffAlgoHeight) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(PHASE_1_DYNODE_PAYMENT), PHASE_1_DYNODE_PAYMENT);
-        return PHASE_1_DYNODE_PAYMENT; // 0.382 DYN
-    }
-    else if (fDynode && chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && chainActive.Height() >= Params().GetConsensus().nUpdateDiffAlgoHeight) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(PHASE_2_DYNODE_PAYMENT), PHASE_2_DYNODE_PAYMENT);
-        return PHASE_2_DYNODE_PAYMENT; // 0.618 DYN
-    }
-    else if ((fDynode && !fDynode) && chainActive.Height() <= Params().GetConsensus().nDynodePaymentsStartBlock) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(BLOCKCHAIN_INIT_REWARD), BLOCKCHAIN_INIT_REWARD);
-        return BLOCKCHAIN_INIT_REWARD;
-    }
-    else
-        return BLOCKCHAIN_INIT_REWARD;
-}
-
 bool IsInitialBlockDownload()
 {
     static bool lockIBDState = false;
@@ -3096,7 +3060,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 	CBlock previousBlock;
 	CDynamicAddress addressX;
 	CValidationState validationState;
-	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt;
+	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt, newReward, newDynodeReward;
 	std::string strError = "";
 	
 	// We need the entire previous block to check!
@@ -3124,6 +3088,23 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
    	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + (nValueOut - nValueIn) - dynamicBurnt;
    	pindex->nDynamicBurnt = (pindex->pprev? pindex->pprev->nDynamicBurnt : 0) + dynamicBurnt;
 
+
+	// Get override reward transactions from the network
+	
+	/*
+	 * if (!fluid.GetBlockOverrideTxes(previousBlock, validationState, newReward) {
+	 * 		pindex->overridenBlockReward = (pindex->pprev? pindex->pprev->overridenBlockReward : 0);
+	 * } else {
+	 * 		pindex->overridenBlockReward = newReward;
+	 * }
+	 * 
+	 * if (!fluid.GetDynodeOverrideTxes(previousBlock, validationState, newDynodeReward) {
+	 * 		pindex->overridenDynodeReward = (pindex->pprev? pindex->pprev->overridenDynodeReward : 0);
+	 * } else {
+	 * 		pindex->overridenDynodeReward = newDynodeReward;
+	 * }
+	 */
+		
     // END DYNAMIC
 
     if (!control.Wait())
@@ -4247,6 +4228,11 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME)
         return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
 
+	// Check spaces between blocks
+	/* int64_t spaceBetweenBlocks = (block.GetBlockTime() - pindexPrev->nTime);
+	if (spaceBetweenBlocks > blockTolerance || spaceBetweenBlocks < blockTolerance) 
+		return state.Invalid(false, REJECT_INVALID, "time-spacing-error", "block timestamp between then and previous too little or too much");
+	*/
     return true;
 }
 

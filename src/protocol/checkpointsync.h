@@ -28,6 +28,8 @@
 
 #include "net.h"
 #include "util.h"
+#include "hash.h"
+#include "serialize.h"
 
 #define CHECKPOINT_MAX_SPAN (60 * 60 * 4) // max 4 hours before latest block
 
@@ -64,15 +66,17 @@ class CUnsignedSyncCheckpoint
 public:
     int nVersion;
     uint256 hashCheckpoint;      // checkpoint block
-    int64 enforcingPaymentsTime;      // if we should
+    int64_t enforcingPaymentsTime;      // if we should
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         READWRITE(hashCheckpoint);
         READWRITE(enforcingPaymentsTime);
-    )
+    }
 
     void SetNull()
     {
@@ -96,7 +100,7 @@ public:
 
     void print() const
     {
-        printf("%s", ToString().c_str());
+        LogPrintf("%s", ToString().c_str());
     }
 };
 
@@ -115,11 +119,14 @@ public:
         SetNull();
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(vchMsg);
         READWRITE(vchSig);
-    )
+    }
 
     void SetNull()
     {

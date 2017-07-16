@@ -23,3 +23,5 @@
  */
 
 #include "duality.h"
+
+DynamicParameters dynLimits;

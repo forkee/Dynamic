@@ -15,6 +15,7 @@
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
+const std::string CBaseChainParams::DEBUGTEST = "debugtest";
 
 void AppendParamsHelpMessages(std::string& strUsage, bool debugHelp)
 {
@@ -67,6 +68,20 @@ public:
 };
 static CBaseRegTestParams regTestParams;
 
+/*
+ * Regression test
+ */
+class CBaseDebugTestParams : public CBaseChainParams
+{
+public:
+    CBaseDebugTestParams()
+    {
+        nRPCPort = 31550;
+        strDataDir = "debugtest";
+    }
+};
+static CBaseDebugTestParams regTestParams;
+
 static CBaseChainParams* pCurrentBaseParams = 0;
 
 const CBaseChainParams& BaseParams()
@@ -83,7 +98,9 @@ CBaseChainParams& BaseParams(const std::string& chain)
         return testNetParams;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
-    else
+    else if (chain == CBaseChainParams::DEBUGTEST)
+        return debugTestParams;
+	else
         throw std::runtime_error(strprintf("%s: Unknown chain %s.", __func__, chain));
 }
 
@@ -96,13 +113,16 @@ std::string ChainNameFromCommandLine()
 {
     bool fRegTest = GetBoolArg("-regtest", false);
     bool fTestNet = GetBoolArg("-testnet", false);
+	bool fDebugTest = GetBoolArg("-debugtest", false);
 
-    if (fTestNet && fRegTest)
+    if (fTestNet && fRegTest && fDebugTest)
         throw std::runtime_error("Invalid combination of -regtest and -testnet.");
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
         return CBaseChainParams::TESTNET;
+	if (fDebugTest)
+		return CBaseChainParams::DEBUGTEST;
     return CBaseChainParams::MAIN;
 }
 

@@ -95,6 +95,12 @@ public:
     int FulfilledRequestExpireTime() const { return nFulfilledRequestExpireTime; }
     std::string SporkPubKey() const { return strSporkPubKey; }
     std::string DynodePaymentPubKey() const { return strDynodePaymentsPubKey; }
+    /*
+    void injectGenesisBlock(CBlock block) {
+		fMiningRequiresPeers = false;
+		genesis = block;
+	}
+	*/
 protected:
     CChainParams() {}
 

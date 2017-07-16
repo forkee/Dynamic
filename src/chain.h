@@ -152,7 +152,9 @@ public:
     unsigned int nNonce;
 	CAmount nMoneySupply;
 	CAmount nDynamicBurnt;
-
+	CAmount overridenBlockReward;
+	CAmount overridenDynodeReward;
+	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
@@ -172,7 +174,9 @@ public:
         nSequenceId = 0;
 		nMoneySupply = 0;
 		nDynamicBurnt = 0;
-
+		overridenBlockReward = 0;
+		overridenDynodeReward = 0;
+		
         nVersion       = 0;
         hashMerkleRoot = uint256();
         nTime          = 0;
@@ -337,13 +341,15 @@ public:
         READWRITE(nNonce);
         READWRITE(nMoneySupply);
 		READWRITE(nDynamicBurnt);
+		READWRITE(overridenBlockReward);
+		READWRITE(overridenDynodeReward);
     }
 
     uint256 GetBlockHash() const
     {
         if(hash != uint256()) return hash;
         // should never really get here, keeping this as a fallback
-        CBlockHeader block;
+        CBlock block;
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
         block.hashMerkleRoot  = hashMerkleRoot;

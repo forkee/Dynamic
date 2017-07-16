@@ -29,12 +29,12 @@
 #include "checkpointsync.h"
 
 #include "base58.h"
-#include "bitcoinrpc.h"
+#include "rpcserver.h"
+#include "rpcclient.h"
 #include "main.h"
 #include "txdb.h"
 #include "uint256.h"
 
-using namespace json_spirit;
 using namespace std;
 
 // sync-checkpoint master key
@@ -152,7 +152,7 @@ bool AcceptPendingSyncCheckpoint()
         hashPendingCheckpoint = 0;
         checkpointMessage = checkpointMessagePending;
         checkpointMessagePending.SetNull();
-        printf("AcceptPendingSyncCheckpoint : sync-checkpoint at %s\n", hashSyncCheckpoint.ToString().c_str());
+        LogPrintf("AcceptPendingSyncCheckpoint : sync-checkpoint at %s\n", hashSyncCheckpoint.ToString().c_str());
         // relay the checkpoint
         if (!checkpointMessage.IsNull())
         {
@@ -221,7 +221,7 @@ bool ResetSyncCheckpoint()
     if (mapBlockIndex.count(hash) && !mapBlockIndex[hash]->IsInMainChain())
     {
         // checkpoint block accepted but not yet in main chain
-        printf("ResetSyncCheckpoint: SetBestChain to hardened checkpoint %s\n", hash.ToString().c_str());
+        LogPrintf("ResetSyncCheckpoint: SetBestChain to hardened checkpoint %s\n", hash.ToString().c_str());
         CValidationState state;
         if (!SetBestChain(state, mapBlockIndex[hash]))
         {
@@ -235,7 +235,7 @@ bool ResetSyncCheckpoint()
 
     if (!WriteSyncCheckpoint(hash))
         return error("ResetSyncCheckpoint: failed to write sync checkpoint %s", hash.ToString().c_str());
-    printf("ResetSyncCheckpoint: sync-checkpoint reset to %s\n", hashSyncCheckpoint.ToString().c_str());
+    LogPrintf("ResetSyncCheckpoint: sync-checkpoint reset to %s\n", hashSyncCheckpoint.ToString().c_str());
     return true;
 }
 
@@ -274,7 +274,7 @@ bool SetCheckpointPrivKey(std::string strPrivKey)
     sMsg << (CUnsignedSyncCheckpoint)checkpoint;
     checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
 
-    CBitcoinSecret vchSecret;
+    CDynamicSecret vchSecret;
     if (!vchSecret.SetString(strPrivKey))
         return error("SendSyncCheckpoint: Checkpoint master key invalid");
     CKey key = vchSecret.GetKey(); // if key is not correct openssl may crash
@@ -298,7 +298,7 @@ bool SendSyncCheckpoint(uint256 hashCheckpoint)
 
     if (CSyncCheckpoint::strMasterPrivKey.empty())
         return error("SendSyncCheckpoint: Checkpoint master key unavailable.");
-    CBitcoinSecret vchSecret;
+    CDynamicSecret vchSecret;
     if (!vchSecret.SetString(CSyncCheckpoint::strMasterPrivKey))
         return error("SendSyncCheckpoint: Checkpoint master key invalid");
     CKey key = vchSecret.GetKey(); // if key is not correct openssl may crash
@@ -307,7 +307,7 @@ bool SendSyncCheckpoint(uint256 hashCheckpoint)
 
     if(!checkpoint.ProcessSyncCheckpoint(NULL))
     {
-        printf("WARNING: SendSyncCheckpoint: Failed to process checkpoint.\n");
+        LogPrintf("WARNING: SendSyncCheckpoint: Failed to process checkpoint.\n");
         return false;
     }
 
@@ -375,7 +375,7 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
         // We haven't received the checkpoint chain, keep the checkpoint as pending
         hashPendingCheckpoint = hashCheckpoint;
         checkpointMessagePending = *this;
-        printf("ProcessSyncCheckpoint: pending for sync-checkpoint %s\n", hashCheckpoint.ToString().c_str());
+        LogPrintf("ProcessSyncCheckpoint: pending for sync-checkpoint %s\n", hashCheckpoint.ToString().c_str());
         // Ask this guy to fill in what we're missing
         if (pfrom)
         {
@@ -407,10 +407,10 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
     checkpointMessage = *this;
     hashPendingCheckpoint = 0;
     checkpointMessagePending.SetNull();
-    printf("ProcessSyncCheckpoint: sync-checkpoint at %s\n", hashCheckpoint.ToString().c_str());
+    LogPrintf("ProcessSyncCheckpoint: sync-checkpoint at %s\n", hashCheckpoint.ToString().c_str());
     return true;
 }
-
+/*
 
 // RPC commands related to sync checkpoints
 // get information of sync-checkpoint (first introduced in ppcoin)
@@ -429,7 +429,7 @@ Value getcheckpoint(const Array& params, bool fHelp)
     {
         pindexCheckpoint = mapBlockIndex[hashSyncCheckpoint];
         result.push_back(Pair("height", pindexCheckpoint->nHeight));
-        result.push_back(Pair("timestamp", (boost::int64_t) pindexCheckpoint->GetBlockTime()));
+        result.push_back(Pair("timestamp", (boost::int64_t_t) pindexCheckpoint->GetBlockTime()));
     }
     result.push_back(Pair("subscribemode", IsSyncCheckpointEnforced()? "enforce" : "advisory"));
     if (mapArgs.count("-checkpointkey"))
@@ -462,7 +462,7 @@ Value sendcheckpoint(const Array& params, bool fHelp)
     {
         pindexCheckpoint = mapBlockIndex[hashSyncCheckpoint];
         result.push_back(Pair("height", pindexCheckpoint->nHeight));
-        result.push_back(Pair("timestamp", (boost::int64_t) pindexCheckpoint->GetBlockTime()));
+        result.push_back(Pair("timestamp", (boost::int64_t_t) pindexCheckpoint->GetBlockTime()));
     }
     result.push_back(Pair("subscribemode", IsSyncCheckpointEnforced()? "enforce" : "advisory"));
     if (mapArgs.count("-checkpointkey"))
@@ -488,9 +488,10 @@ Value enforcecheckpoint(const Array& params, bool fHelp)
         strCheckpointWarning = "";
     mapArgs["-checkpointenforce"] = (fEnforceCheckpoint ? "1" : "0");
     
-    int64 enforceMasternodePaymentsIn = params[1].get_int64();
+    int64_t enforceMasternodePaymentsIn = params[1].get_int64_t();
     enforceMasternodePaymentsTime = enforceMasternodePaymentsIn;
 
     return Value::null;
 }
 
+*/

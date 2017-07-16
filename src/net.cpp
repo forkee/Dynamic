@@ -27,7 +27,7 @@
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 #include "wallet/wallet.h"
-#include "ntp.h"
+#include "protocol/ntp.h"
 
 #ifdef WIN32
 #include <string.h>

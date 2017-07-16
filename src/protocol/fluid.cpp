@@ -44,8 +44,8 @@ extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CA
 
 Fluid fluid;
 
-CAmount Fluid::DeriveSupplyPercentage(int64_t percentage) {
-	int64_t supply = 100000*COIN;//chainActive.Tip()->nMoneySupply;
+CAmount Fluid::DeriveSupplyPercentage(int64_t percentage, CBlockIndex* pindex) {
+	int64_t supply = pindex->nMoneySupply;
 	return supply * percentage / 100;
 }
 
@@ -376,7 +376,7 @@ void Fluid::GetDestructionTxes(const CBlock& block, CValidationState& state, CAm
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsDestroyScript()) {
 				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, parseToDestroy)) {
-					amountDestroyed += parseToDestroy; // This is what metric we need to get
+					amountDestroyed += txout.nValue; // This is what metric we need to get
 				}
 			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
@@ -456,6 +456,81 @@ bool Fluid::GetKillRequest(const CBlock& block, CValidationState& state) {
 	return false;
 }
 
-bool DeriveBlockInfoFromHash(CBlock &block, uint256 prevBlock) {
-	return false;
+bool Fluid::DeriveBlockInfoFromHash(CBlock &block, uint256 hash) {
+    if (mapBlockIndex.count(hash) == 0) {
+      	LogPrintf("Fluid::DeriveBlockInfoFromHash: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
+        return false;
+    }
+    
+    CBlockIndex* pblockindex = mapBlockIndex[hash];
+
+    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
+		LogPrintf("Fluid::DeriveBlockInfoFromHash: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
+        return false;
+	}
+    
+    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
+		LogPrintf("Fluid::DeriveBlockInfoFromHash: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
+        return false;
+	}
+	
+    return true;
+}
+
+CAmount GetPoWBlockPayment(const int& nHeight, CAmount nFees)
+{
+	CAmount nSubsidy = BLOCKCHAIN_INIT_REWARD;
+	
+	if (chainActive.Height() >= 1 && chainActive.Height() <= Params().GetConsensus().nRewardsStart) {
+        nSubsidy = BLOCKCHAIN_INIT_REWARD;
+    }
+    else if (chainActive.Height() > Params().GetConsensus().nRewardsStart) {
+        nSubsidy = PHASE_1_POW_REWARD;
+    }
+	
+	LogPrint("creation", "GetPoWBlockPayment() : create=%s PoW Reward=%d\n", FormatMoney(nSubsidy+nFees), nSubsidy+nFees);
+
+	return nSubsidy + nFees;
+}
+
+CAmount GetDynodePayment(bool fDynode)
+{
+	CAmount dynodePayment = BLOCKCHAIN_INIT_REWARD;
+	
+    if (fDynode && 
+		chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && 
+		chainActive.Height() < Params().GetConsensus().nUpdateDiffAlgoHeight) {
+        dynodePayment = PHASE_1_DYNODE_PAYMENT;
+    }
+    else if (fDynode && 
+			chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && 
+			chainActive.Height() >= Params().GetConsensus().nUpdateDiffAlgoHeight) {
+        dynodePayment = PHASE_2_DYNODE_PAYMENT;
+    }
+    else if ((fDynode && !fDynode) &&
+			chainActive.Height() <= Params().GetConsensus().nDynodePaymentsStartBlock) {
+        dynodePayment = BLOCKCHAIN_INIT_REWARD;
+    }
+	
+	LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(dynodePayment), dynodePayment);
+
+    return dynodePayment;
+}
+
+/** Passover code that will act as a switch to check if override did occur for Proof of Work Rewards **/ 
+CAmount getBlockSubsidyWithOverride(const int& nHeight, CAmount nFees, CAmount lastOverrideCommand) {
+	if (lastOverrideCommand != 0) {
+		return lastOverrideCommand;
+	} else {
+		return GetPoWBlockPayment(nHeight, nFees);
+	}
+}
+
+/** Passover code that will act as a switch to check if override did occur for Dynode Rewards **/ 
+CAmount getDynodeSubsidyWithOverride(bool fDynode, CAmount lastOverrideCommand) {
+	if (lastOverrideCommand != 0) {
+		return lastOverrideCommand;
+	} else {
+		return GetDynodePayment(fDynode);
+	}
 }

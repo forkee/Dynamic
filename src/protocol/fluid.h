@@ -29,6 +29,7 @@
 #include "amount.h"
 #include "chain.h"
 #include "script/script.h"
+#include "consensus/validation.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -50,7 +51,7 @@ class CBlockTemplate;
 
 class Fluid {
 private:
-	CAmount DeriveSupplyPercentage(int64_t percentage);
+	CAmount DeriveSupplyPercentage(int64_t percentage, CBlockIndex* pindex);
 		
 	CAmount DeriveSupplyBurnt() {
 		return 0 * COIN; // We create trackable money supply
@@ -92,7 +93,10 @@ private:
 public:
 	static const CAmount fluidMintingMinimum = 100 * COIN;
 	CAmount fluidMintingMaximum = DeriveSupplyPercentage(10); // Maximum 10% can be minted!
-	std::string fluidMasterAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	
+	std::string fluidImportantAddressX = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	std::string fluidImportantAddressY = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
+	std::string fluidImportantAddressZ = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg";
 
 	void ConvertToHex(std::string &input) { std::string output = StringToHex(input); input = output; }
 	void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }
@@ -122,7 +126,7 @@ public:
 	
 	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
 	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
-	bool DeriveBlockInfoFromHash(CBlock &block, uint256 prevBlock);
+	bool DeriveBlockInfoFromHash(CBlock &block, uint256 hash);
 	
 	bool GenerateFluidToken(CDynamicAddress sendToward, 
 							CAmount tokenMintAmt, std::string &issuanceString);
@@ -137,6 +141,9 @@ public:
 	bool GenerateKillToken(std::string &killString);
 	bool GetKillRequest(const CBlock& block, CValidationState& state);
 };
+
+CAmount getBlockSubsidyWithOverride(const int& nHeight, CAmount nFees, CAmount lastOverrideCommand);
+CAmount getDynodeSubsidyWithOverride(bool fDynode, CAmount lastOverrideCommand);
 
 extern Fluid fluid;
 

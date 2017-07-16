@@ -421,6 +421,107 @@ public:
 };
 static CRegTestParams regTestParams;
 
+
+/**
+ * Debugging test
+ */
+class CDebugTestParams : public CChainParams {
+public:
+    CDebugTestParams() {
+        strNetworkID = "debugtest";
+        consensus.nRewardsStart = 0; // Rewards starts on block 0
+        consensus.nDynodePaymentsStartBlock = 0;
+        consensus.nInstantSendKeepLock = 24;
+        consensus.nBudgetPaymentsStartBlock = 1000;
+        consensus.nBudgetPaymentsCycleBlocks = 50;
+        consensus.nBudgetPaymentsWindowBlocks = 10;
+        consensus.nBudgetProposalEstablishingTime = 60 * 20;
+        consensus.nSuperblockStartBlock = 0;
+        consensus.nSuperblockCycle = 10;
+        consensus.nGovernanceMinQuorum = 1;
+        consensus.nGovernanceFilterElements = 100;
+        consensus.nDynodeMinimumConfirmations = 1;
+        consensus.nMajorityEnforceBlockUpgrade = 750;
+        consensus.nMajorityRejectBlockOutdated = 950;
+        consensus.nMajorityWindow = 1000;
+        consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
+        consensus.nPowTargetTimespan = 24 * 60 * 60; // Dynamic: 24 hours
+        consensus.nPowTargetSpacing = 2 * 64; // Dynamic: 256 seconds
+        consensus.nPowMaxAdjustDown = 32; // Dynamic: 32% adjustment down
+        consensus.nPowMaxAdjustUp = 16; // Dynamic: 16% adjustment up
+        consensus.nUpdateDiffAlgoHeight = 1; // Dynamic: Algorithm fork block
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowNoRetargeting = true;
+        consensus.nRuleChangeActivationThreshold = 254; // 75% of nMinerConfirmationWindow
+        consensus.nMinerConfirmationWindow = 338; // Faster than normal for regtest (144 instead of 2016)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
+
+        pchMessageStart[0] = 0x2f;
+        pchMessageStart[1] = 0x32;
+        pchMessageStart[2] = 0x15;
+        pchMessageStart[3] = 0x3f;
+        
+        nMaxTipAge = 24 * 60 * 64;
+        nDefaultPort = 31500;
+        nPruneAfterHeight = 100;
+        startNewChain = false;
+
+		int64_t nTime = GetTime();
+        genesis = CreateGenesisBlock(nTime, 0, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
+
+		arith_uint256 besthash;
+		memset(&besthash,0xFF,32);
+		arith_uint256 hashTarget = UintToArith256(consensus.powLimit).GetCompact();
+		arith_uint256 newhash = UintToArith256(genesis.GetHash());
+
+		while (newhash > hashTarget) {
+			genesis.nNonce++;
+			if (genesis.nNonce == 0) {
+				++genesis.nTime;
+			}
+
+			if(newhash < besthash) {
+				besthash = newhash;
+			}
+			newhash = UintToArith256(genesis.GetHash());
+		}
+		
+        consensus.hashGenesisBlock = ArithToUint256(newhash);
+
+        vFixedSeeds.clear(); //! Regtest mode doesn't have any fixed seeds.
+        vSeeds.clear();  //! Regtest mode doesn't have any DNS seeds.
+
+        fMiningRequiresPeers = false;
+        fDefaultConsistencyChecks = true;
+        fRequireStandard = false;
+        fMineBlocksOnDemand = true;
+        fTestnetToBeDeprecatedFieldRPC = false;
+
+        nFulfilledRequestExpireTime = 5 * 60; // fulfilled requests expire in 5 minutes
+        checkpointData = (CCheckpointData) {
+            boost::assign::map_list_of
+            (  0, newhash),
+            genesis.nTime, // * UNIX timestamp of last checkpoint block
+            0,    // * total number of transactions between genesis and last checkpoint
+            //   (the tx=... number in the SetBestChain debug.log lines)
+            500        // * estimated number of transactions per day after checkpoint
+        };
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,140);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,19);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY] = boost::assign::list_of(0x04)(0x35)(0x87)(0xCF).convert_to_container<std::vector<unsigned char> >();
+        base58Prefixes[EXT_SECRET_KEY] = boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
+        nExtCoinType = 1;
+    }
+};
+static CDebugTestParams debugTestParams;
+
 static CChainParams *pCurrentParams = 0;
 
 const CChainParams &Params() {

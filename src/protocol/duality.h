@@ -29,4 +29,13 @@
 
 typedef boost::multiprecision::int128_t BoostInteger;
 
+static const int blockTolerance = 28;
+
+class DynamicParameters {
+public:
+	int maxLimit = 128;
+};
+
+extern DynamicParameters dynLimits;
+
 #endif // DUALITY_H

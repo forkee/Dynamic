@@ -27,15 +27,3 @@ std::string CBlock::ToString() const
     }
     return s.str();
 }
-
-uint256 CBlockHeader::GetHash() const
-{
-	return hash_Argon2d(UVOIDBEGIN(nVersion), 1);
-}
-
-#ifdef __AVX2__   
-uint256 CBlockHeader::GetHashWithCtx(void *Matrix) const
-{
-	return(hash_Argon2d_ctx(UVOIDBEGIN(nVersion), Matrix, 1));
-}
-#endif

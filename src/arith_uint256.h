@@ -244,6 +244,11 @@ public:
      */
     unsigned int bits() const;
 
+    unsigned int GetInt() const
+    {
+	return pn[0];
+    }
+
     uint64_t GetLow64() const
     {
         assert(WIDTH >= 2);
