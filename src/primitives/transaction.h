@@ -19,6 +19,7 @@
 // Our Current implementation is missing Type, Class, and TTL (cache time)
 static const int NAMECOIN_TX_VERSION = 0x1030; //0x1035 is rfc1035, our initial version is 1030.
 typedef std::vector<unsigned char> CNameVal;
+
 struct NameTxInfo
 { 
     CNameVal name;

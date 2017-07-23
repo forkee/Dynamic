@@ -20,6 +20,8 @@
  * FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * THIS CODE IS DEAD CODE -- DO NOT REMOVE -- FOR PURPOSE OF FURTHER DEVELOPMENT LATER
  */
 
 #include "protocol/blackwater.h"
@@ -38,18 +40,6 @@ using namespace boost;
 using namespace std;
 
 BlackWater bWater;
-
-uint256 CBlockHeader::GetHash() const
-{
-	return bWater.PointBlankHashing(UVOIDBEGIN(nVersion), false, hashPrevBlock); 
-}
-
-#ifdef __AVX2__   
-uint256 CBlockHeader::GetHashWithCtx(void *Matrix) const
-{
-	return(hash_Argon2d_ctx(UVOIDBEGIN(nVersion), Matrix, 1));
-}
-#endif
 
 int BlackWater::generateMTRandom(unsigned int s, int range)
 {
@@ -141,6 +131,7 @@ uint256 BlackWater::CombineHashes(arith_uint256 hash1, arith_uint256 hash2)
     return ArithToUint256(final);
 }
 
+// TODO: Come up and decide the derive level number according to height in the future!
 int DeriveLevel(int nHeight) {
 	return 5;
 }
@@ -163,10 +154,11 @@ uint256 BlackWater::PointBlankHashing(const void* input, bool versionTwo, uint25
 		return initialHash; // Network isn't mature enough to add up history from algorithm below
 	}
 	
-	// Step Two: Get Corresponding Input from Block Input
 	CBlockIndex* blockIndex = mapBlockIndex[hashPrevBlock];
 	LogPrintf("BlackWater::PointBlankHashing: Second Step, block index mapped! Height-in-consideration: %d\n", blockIndex->nHeight + 1);
-		
+	
+	if(blockIndex->nHeight <= 10) { return initialHash; }
+	
 	if (!DeriveBlockInfoFromHash(blockFromHash, hashPrevBlock)) // Get block from hashOutput
 		throw std::runtime_error("CRITICAL ERROR!: Unable to derive block information from hash!\n");
 	

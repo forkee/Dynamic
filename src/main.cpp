@@ -1037,6 +1037,31 @@ int GetISConfirmations(const uint256 &nTXHash)
     return 0;
 }
 
+bool CheckInstruction(const CTransaction& tx, CValidationState &state) {
+	// We check if the transaction even constitutes an instruction, every given transaction processed through must be a instruction
+	CAmount nCoinsBurn = 0;
+	BOOST_FOREACH(const CTxOut& txout, tx.vout)
+    {	
+		if (!txout.scriptPubKey.IsProtocolInstruction(MINT_TX)) {
+			if (!txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX)) {
+				if (!txout.scriptPubKey.IsProtocolInstruction(KILL_TX)) {
+					if (!txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX)) {
+						if (!txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)) {
+							if (!txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX)) {
+								if (!txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX)) {
+									return state.DoS(100, false, REJECT_INVALID, "bad-txns-transaction-is-not-protocol");
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return CheckTransaction(tx, state); // Check if it is a sane transaction
+}
+
 bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
@@ -1049,7 +1074,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
     // Check for negative or overflow output values
-    CAmount nValueOut = 0, nCoinsBurn = 0;
+    CAmount nValueOut = 0;
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
         if (txout.nValue < 0)
@@ -1060,14 +1085,20 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 		
-		if (txout.scriptPubKey.IsDestroyScript()) {
+		if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) 
+			|| txout.scriptPubKey.IsProtocolInstruction(KILL_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX)
+			) {
+			if (!fluid.GenericVerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
+		}
+
+		if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX)) {
 			if (!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-auth-failure");
-		}
-		
-		if (txout.scriptPubKey.IsMintInstruction() || txout.scriptPubKey.IsKillScript()) {
-			if (!fluid.VerifyInstruction(ScriptToAsmStr(txout.scriptPubKey)))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
 		}
     }
 
@@ -1818,6 +1849,13 @@ bool GetTransaction(const uint256 &hash, CTransaction &txOut, const Consensus::P
     if (pindexSlow) {
         CBlock block;
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams)) {
+            BOOST_FOREACH(const CTransaction &tx, block.instructionTx) {
+                if (tx.GetHash() == hash) {
+                    txOut = tx;
+                    hashBlock = pindexSlow->GetBlockHash();
+                    return true;
+                }
+            }
             BOOST_FOREACH(const CTransaction &tx, block.vtx) {
                 if (tx.GetHash() == hash) {
                     txOut = tx;
@@ -2501,7 +2539,7 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
     if (!UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash()))
         return error("DisconnectBlock(): failure reading undo data");
 
-    if (blockUndo.vtxundo.size() + 1 != block.vtx.size())
+    if (blockUndo.vtxundo.size() + 1 != block.vtx.size() + block.instructionTx.size())
         return error("DisconnectBlock(): block and undo data inconsistent");
 
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
@@ -2511,6 +2549,108 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = block.vtx[i];
+        uint256 hash = tx.GetHash();
+
+        if (fAddressIndex) {
+
+            for (unsigned int k = tx.vout.size(); k-- > 0;) {
+                const CTxOut &out = tx.vout[k];
+
+                if (out.scriptPubKey.IsPayToScriptHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+
+                    // undo receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
+
+                    // undo unspent index
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), hash, k), CAddressUnspentValue()));
+
+                } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+
+                    // undo receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
+
+                    // undo unspent index
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k), CAddressUnspentValue()));
+
+                } else {
+                    continue;
+                }
+
+            }
+
+        }
+
+        // Check that all outputs are available and match the outputs in the block itself
+        // exactly.
+        {
+        CCoinsModifier outs = view.ModifyCoins(hash);
+        outs->ClearUnspendable();
+
+        CCoins outsBlock(tx, pindex->nHeight);
+        // The CCoins serialization does not serialize negative numbers.
+        // No network rules currently depend on the version here, so an inconsistency is harmless
+        // but it must be corrected before txout nversion ever influences a network rule.
+        if (outsBlock.nVersion < 0)
+            outs->nVersion = outsBlock.nVersion;
+        if (*outs != outsBlock)
+            fClean = fClean && error("DisconnectBlock(): added transaction mismatch? database corrupted");
+
+        // remove outputs
+        outs->Clear();
+        }
+
+        // restore inputs
+        if (i > 0) { // not coinbases
+            const CTxUndo &txundo = blockUndo.vtxundo[i-1];
+            if (txundo.vprevout.size() != tx.vin.size())
+                return error("DisconnectBlock(): transaction and undo data inconsistent");
+            for (unsigned int j = tx.vin.size(); j-- > 0;) {
+                const COutPoint &out = tx.vin[j].prevout;
+                const CTxInUndo &undo = txundo.vprevout[j];
+                if (!ApplyTxInUndo(undo, view, out))
+                    fClean = false;
+
+                const CTxIn input = tx.vin[j];
+
+                if (fSpentIndex) {
+                    // undo and delete the spent index
+                    spentIndex.push_back(std::make_pair(CSpentIndexKey(input.prevout.hash, input.prevout.n), CSpentIndexValue()));
+                }
+
+                if (fAddressIndex) {
+                    const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
+                    if (prevout.scriptPubKey.IsPayToScriptHash()) {
+                        std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22);
+
+                        // undo spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevout.nValue * -1));
+
+                        // restore unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight)));
+
+
+                    } else if (prevout.scriptPubKey.IsPayToPublicKeyHash()) {
+                        std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23);
+
+                        // undo spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevout.nValue * -1));
+
+                        // restore unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight)));
+
+                    } else {
+                        continue;
+                    }
+                }
+
+            }
+        }
+    }
+    
+    for (int i = block.instructionTx.size() - 1; i >= 0; i--) {
+        const CTransaction &tx = block.instructionTx[i];
         uint256 hash = tx.GetHash();
 
         if (fAddressIndex) {
@@ -2886,10 +3026,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     CAmount nFees = 0;
     int nInputs = 0;
     unsigned int nSigOps = 0;
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size() + block.instructionTx.size()));
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-    vPos.reserve(block.vtx.size());
-    blockundo.vtxundo.reserve(block.vtx.size() - 1);
+    vPos.reserve(block.vtx.size() + block.instructionTx.size());
+    blockundo.vtxundo.reserve(block.vtx.size() + block.instructionTx.size() - 2);
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
     std::vector<std::pair<CSpentIndexKey, CSpentIndexValue> > spentIndex;
@@ -3036,7 +3176,152 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+    }    
+    
+    for (unsigned int i = 0; i < block.instructionTx.size(); i++)
+    {
+        const CTransaction &tx = block.instructionTx[i];
+        const uint256 txhash = tx.GetHash();
+
+        nInputs += tx.vin.size();
+        nSigOps += GetLegacySigOpCount(tx);
+        if (nSigOps > MAX_BLOCK_SIGOPS)
+            return state.DoS(100, error("ConnectBlock(): too many sigops"),
+                             REJECT_INVALID, "bad-blk-sigops");
+
+        if (!tx.IsCoinBase())
+        {
+            if (!view.HaveInputs(tx))
+                return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
+                                 REJECT_INVALID, "bad-txns-inputs-missingorspent");
+
+            // Check that transaction is BIP68 final
+            // BIP68 lock checks (as opposed to nLockTime checks) must
+            // be in ConnectBlock because they require the UTXO set
+            prevheights.resize(tx.vin.size());
+            for (size_t j = 0; j < tx.vin.size(); j++) {
+                prevheights[j] = view.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+            }
+
+            // Which orphan pool entries must we evict?
+            for (size_t j = 0; j < tx.vin.size(); j++) {
+                auto itByPrev = mapOrphanTransactionsByPrev.find(tx.vin[j].prevout);
+                if (itByPrev == mapOrphanTransactionsByPrev.end()) continue;
+                for (auto mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi) {
+                    const CTransaction& orphanTx = (*mi)->second.tx;
+                    const uint256& orphanHash = orphanTx.GetHash();
+                    vOrphanErase.push_back(orphanHash);
+                }
+            }
+
+            if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
+                return state.DoS(100, error("%s: contains a non-BIP68-final transaction", __func__),
+                                 REJECT_INVALID, "bad-txns-nonfinal");
+            }
+
+            if (fAddressIndex || fSpentIndex)
+            {
+                for (size_t j = 0; j < tx.vin.size(); j++) {
+
+                    const CTxIn input = tx.vin[j];
+                    const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
+                    uint160 hashBytes;
+                    int addressType;
+
+                    if (prevout.scriptPubKey.IsPayToScriptHash()) {
+                        hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22));
+                        addressType = 2;
+                    } else if (prevout.scriptPubKey.IsPayToPublicKeyHash()) {
+                        hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23));
+                        addressType = 1;
+                    } else {
+                        hashBytes.SetNull();
+                        addressType = 0;
+                    }
+
+                    if (fAddressIndex && addressType > 0) {
+                        // record spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(addressType, hashBytes, pindex->nHeight, i, txhash, j, true), prevout.nValue * -1));
+
+                        // remove address from unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, input.prevout.hash, input.prevout.n), CAddressUnspentValue()));
+                    }
+
+                    if (fSpentIndex) {
+                        // add the spent index to determine the txid and input that spent an output
+                        // and to find the amount and address from an input
+                        spentIndex.push_back(std::make_pair(CSpentIndexKey(input.prevout.hash, input.prevout.n), CSpentIndexValue(txhash, j, pindex->nHeight, prevout.nValue, addressType, hashBytes)));
+                    }
+                }
+
+            }
+
+            if (fStrictPayToScriptHash)
+            {
+                // Add in sigops done by pay-to-script-hash inputs;
+                // this is to prevent a "rogue miner" from creating
+                // an incredibly-expensive-to-validate block.
+                nSigOps += GetP2SHSigOpCount(tx, view);
+                if (nSigOps > MAX_BLOCK_SIGOPS)
+                    return state.DoS(100, error("ConnectBlock(): too many sigops"),
+                                     REJECT_INVALID, "bad-blk-sigops");
+            }
+
+            nFees += view.GetValueIn(tx)-tx.GetValueOut();
+			
+			nValueIn += view.GetValueIn(tx);
+            nValueOut += tx.GetValueOut();
+
+            std::vector<CScriptCheck> vChecks;
+            bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
+            if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL))
+                return error("ConnectBlock(): CheckInputs on %s failed with %s",
+                    tx.GetHash().ToString(), FormatStateMessage(state));
+			if (!CheckDynamicInputs(tx, view, fJustCheck, pindex->nHeight))
+				return error("ConnectBlock(): CheckDynamicInputs on %s failed",tx.GetHash().ToString());
+
+            control.Add(vChecks);
+        }
+
+        if (fAddressIndex) {
+            for (unsigned int k = 0; k < tx.vout.size(); k++) {
+                const CTxOut &out = tx.vout[k];
+
+                if (out.scriptPubKey.IsPayToScriptHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+
+                    // record receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, txhash, k, false), out.nValue));
+
+                    // record unspent output
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), txhash, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight)));
+
+                } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+
+                    // record receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, txhash, k, false), out.nValue));
+
+                    // record unspent output
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), txhash, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight)));
+
+                } else {
+                    continue;
+                }
+
+            }
+        }
+
+        CTxUndo undoDummy;
+        if (i > 0) {
+            blockundo.vtxundo.push_back(CTxUndo());
+        }
+        UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+
+        vPos.push_back(std::make_pair(tx.GetHash(), pos));
+        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
+    
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * 0.000001);
 
@@ -3057,19 +3342,18 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         fDynodePaid = false;
     }
     
-	CBlock previousBlock;
 	CDynamicAddress addressX;
 	CValidationState validationState;
 	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt, newReward, newDynodeReward;
 	std::string strError = "";
 	
-	// We need the entire previous block to check!
-	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindex->pprev);
-	
-	if (fluid.GetMintingInstructions(previousBlock, validationState, addressX, fluidIssuance) && isItUsable) {
-	    nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees) + fluidIssuance;
+	if (fluid.GetMintingInstructions(pindex->pprev, validationState, addressX, fluidIssuance) && isItUsable) {
+	    nExpectedBlockValue = 	getDynodeSubsidyWithOverride(pindex->pprev->overridenDynodeReward, fDynodePaid) + 
+								getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward) + 
+								fluidIssuance;
 	} else {
-		nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
+		nExpectedBlockValue = 	getDynodeSubsidyWithOverride(pindex->pprev->overridenDynodeReward, fDynodePaid) + 
+								getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward);
 	}
 	
 	if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError) && isItUsable) {
@@ -3083,22 +3367,24 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
     
     // Get Destruction Transactions on the Network
-    fluid.GetDestructionTxes(previousBlock, validationState, dynamicBurnt);
+    fluid.GetDestructionTxes(pindex->pprev, validationState, dynamicBurnt);
    	
    	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + (nValueOut - nValueIn) - dynamicBurnt;
    	pindex->nDynamicBurnt = (pindex->pprev? pindex->pprev->nDynamicBurnt : 0) + dynamicBurnt;
 
 
 	// Get override reward transactions from the network
+	// getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward)
+	// GetDynodePayment(fDynodePaid, pindex->pprev->overridenDynodeReward)
 	
 	/*
-	 * if (!fluid.GetBlockOverrideTxes(previousBlock, validationState, newReward) {
+	 * if (!fluid.GetBlockOverrideTxes(pindex->pprev, validationState, newReward) {
 	 * 		pindex->overridenBlockReward = (pindex->pprev? pindex->pprev->overridenBlockReward : 0);
 	 * } else {
 	 * 		pindex->overridenBlockReward = newReward;
 	 * }
 	 * 
-	 * if (!fluid.GetDynodeOverrideTxes(previousBlock, validationState, newDynodeReward) {
+	 * if (!fluid.GetDynodeOverrideTxes(pindex->pprev, validationState, newDynodeReward) {
 	 * 		pindex->overridenDynodeReward = (pindex->pprev? pindex->pprev->overridenDynodeReward : 0);
 	 * } else {
 	 * 		pindex->overridenDynodeReward = newDynodeReward;
@@ -3428,6 +3714,9 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // 0-confirmed or conflicted:
+    BOOST_FOREACH(const CTransaction &tx, block.instructionTx) {
+        SyncWithWallets(tx, NULL);
+	}
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
 		// DYNAMIC disconnect
@@ -4073,6 +4362,12 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW)
 {
+	// Let us check if instruction transactions are present
+    BOOST_FOREACH(const CTransaction& tx, block.instructionTx)
+        if (!CheckInstruction(tx, state))
+            return state.DoS(50, error("CheckBlockHeader(): Incorrect protocol instructions!"),
+							 REJECT_INVALID, "bad-instruction");
+
     // Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
@@ -4171,9 +4466,19 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
             return error("CheckBlock(): CheckTransaction of %s failed with %s",
                 tx.GetHash().ToString(),
                 FormatStateMessage(state));
+                
+    BOOST_FOREACH(const CTransaction& tx, block.instructionTx)
+        if (!CheckInstruction(tx, state))
+            return error("CheckBlock(): CheckInstruction of %s failed with %s",
+                tx.GetHash().ToString(),
+                FormatStateMessage(state));
 
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
+    {
+        nSigOps += GetLegacySigOpCount(tx);
+    }    
+    BOOST_FOREACH(const CTransaction& tx, block.instructionTx)
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
@@ -4205,16 +4510,18 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
 { 
     int nHeight = (pindexPrev->nHeight + 1);
     uint256 hash = block.GetHash();
-    CBlock previousBlock;
-    
+
     if (hash == Params().GetConsensus().hashGenesisBlock)
         return true;
 
-	bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindexPrev);
+    BOOST_FOREACH(const CTransaction& tx, block.instructionTx)
+        if (!CheckInstruction(tx, state))
+            return state.DoS(100, error("%s : incorrect protocol instruction %d", __func__, nHeight),
+							 REJECT_INVALID, "bad-instruction");
 
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams)) {
         if (block.nBits != LegacyRetargetBlock(pindexPrev, &block, consensusParams))
-			if (isItUsable && !fluid.GetKillRequest(previousBlock, state))
+			if (isItUsable && !fluid.GetKillRequest(block, state))
 				return state.DoS(100, error("%s : incorrect proof of work at %d", __func__, nHeight),
 							 REJECT_INVALID, "bad-diffbits");
     }
@@ -4253,6 +4560,12 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
 
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
+            return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
+        }
+    }
+    
+    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
             return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }

@@ -80,7 +80,7 @@ public:
         strDataDir = "debugtest";
     }
 };
-static CBaseDebugTestParams regTestParams;
+static CBaseDebugTestParams debugTestParams;
 
 static CBaseChainParams* pCurrentBaseParams = 0;
 

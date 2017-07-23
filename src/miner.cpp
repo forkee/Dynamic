@@ -405,14 +405,12 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 		CDynamicAddress address;
 		CValidationState validationState;
 		CAmount fluidIssuance;
-		CBlock previousBlock;
 		bool areWeMinting = false;
-		bool isItUsable = fluid.DerivePreviousBlockInformation(previousBlock, pindexPrev);
-		CAmount blockReward = GetPoWBlockPayment(nHeight, nFees);
+		CAmount blockReward = getBlockSubsidyWithOverride(nHeight, nFees, pindexPrev->overridenBlockReward);
 
         // Compute regular coinbase transaction.
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        if (fluid.GetMintingInstructions(previousBlock, validationState, address, fluidIssuance) && isItUsable) {
+        if (fluid.GetMintingInstructions(pindex->pprev, validationState, address, fluidIssuance) && isItUsable) {
 			txNew.vout[0].nValue = blockReward + fluidIssuance;
 			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
 			areWeMinting = true;
@@ -451,7 +449,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        if (fluid.GetKillRequest(previousBlock, validationState) && isItUsable) {
+        if (fluid.GetKillRequest(pindexPrev, validationState) && isItUsable) {
 			pblock->nBits          = std::numeric_limits<unsigned int>::max();
         } else {
 			pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());

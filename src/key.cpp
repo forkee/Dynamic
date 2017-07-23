@@ -193,7 +193,7 @@ bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
     Sign(hash, vchSig);
     return pubkey.Verify(hash, vchSig);
 }
-
+/*
 bool CKey::SignCompact(const uint256 &hash, std::vector<unsigned char>& vchSig) const {
     if (!fValid)
         return false;
@@ -208,7 +208,7 @@ bool CKey::SignCompact(const uint256 &hash, std::vector<unsigned char>& vchSig) 
     vchSig[0] = 27 + rec + (fCompressed ? 4 : 0);
     return true;
 }
-
+*/
 bool CKey::Load(CPrivKey &privkey, CPubKey &vchPubKey, bool fSkipCheck=false) {
     if (!ec_privkey_import_der(secp256k1_context_sign, (unsigned char*)begin(), &privkey[0], privkey.size()))
         return false;

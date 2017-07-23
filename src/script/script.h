@@ -72,7 +72,7 @@ enum opcodetype
 	// encrypted messaging
 	OP_MESSAGE_ACTIVATE=0x0f,
 
-     // syscoin extended reserved 
+    // syscoin extended reserved 
     OP_SYSCOIN_EXTENDED=0x10,
     OP_FALSE = OP_0,
     OP_PUSHDATA1 = 0x4c,
@@ -214,6 +214,8 @@ enum opcodetype
 	OP_REWARD_MINING = 0xc4,
 	OP_STERILIZE = 0xc5,
 	OP_KILL = 0xc6,
+	OP_FLUID_DEACTIVATE = 0xc7,
+	OP_FLUID_REACTIVATE = 0xc8,
 	
     // template matching params
     OP_SMALLINTEGER = 0xfa,
@@ -671,26 +673,52 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
-    
-    // TODO: Consolodate!
+        
     bool IsUnspendable() const
     {
         return (size() > 0 && *begin() == OP_RETURN);
     }
-	
-	bool IsMintInstruction() const
+
+    enum ProtocolCodes {
+		MINT_TX,
+		DESTROY_TX,
+		KILL_TX,
+		DYNODE_MODFIY_TX,
+		MINING_MODIFY_TX,
+		ACTIVATE_TX,
+		DEACTIVATE_TX,
+		
+		NO_TX
+	};
+
+	bool IsProtocolInstruction(ProtocolCodes code) const
     {
-        return (size() > 0 && *begin() == OP_MINT);
-    }
-    
-	bool IsDestroyScript() const
-    {
-        return (size() > 0 && *begin() == OP_DESTROY);
-    }
-    
-	bool IsKillScript() const
-    {
-        return (size() > 0 && *begin() == OP_KILL);
+		switch(code) {
+			case MINT_TX:
+				return (size() > 0 && *begin() == OP_MINT);
+				break;
+			case DESTROY_TX:
+				return (size() > 0 && *begin() == OP_DESTROY);
+				break;
+			case KILL_TX:
+				return (size() > 0 && *begin() == OP_KILL);
+				break;
+			case DYNODE_MODFIY_TX:
+				return (size() > 0 && *begin() == OP_REWARD_DYNODE);
+				break;
+			case MINING_MODIFY_TX:
+				return (size() > 0 && *begin() == OP_REWARD_MINING);
+				break;
+			case ACTIVATE_TX:
+				return (size() > 0 && *begin() == OP_FLUID_REACTIVATE);
+				break;
+			case DEACTIVATE_TX:
+				return (size() > 0 && *begin() == OP_FLUID_DEACTIVATE);
+				break;
+			default:
+				throw std::runtime_error("Protocol code is of literally nothing!");
+		}
+		return false;
     }
 
     void clear()

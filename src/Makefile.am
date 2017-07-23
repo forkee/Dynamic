@@ -79,7 +79,6 @@ DYNAMIC_CORE_H = \
   protocol/message.h \
   protocol/offer.h \
   protocol/fluid.h \
-  protocol/blackwater.h \
   protocol/duality.h \
   activedynode.h \
   addressindex.h \
@@ -225,7 +224,6 @@ libdynamic_server_a_SOURCES = \
   protocol/messagecrypter.cpp \
   protocol/offer.cpp \
   protocol/fluid.cpp \
-  protocol/blackwater.cpp \
   protocol/duality.cpp \
   addrman.cpp \
   alert.cpp \
@@ -523,25 +521,31 @@ dynamic_cli_LDADD = \
 dynamic_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
 
+#############################
+##
+## Commented out for protocol
+##
+#############################
+
 # dynamic-tx binary #
-dynamic_tx_SOURCES = dynamic-tx.cpp
-dynamic_tx_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
-dynamic_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-dynamic_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+#dynamic_tx_SOURCES = dynamic-tx.cpp
+#dynamic_tx_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
+#dynamic_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+#dynamic_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
-if TARGET_WINDOWS
-dynamic_tx_SOURCES += dynamic-tx-res.rc
-endif
+#if TARGET_WINDOWS
+#dynamic_tx_SOURCES += dynamic-tx-res.rc
+#endif
 
-dynamic_tx_LDADD = \
-  $(LIBUNIVALUE) \
-  $(LIBDYNAMIC_COMMON) \
-  $(LIBDYNAMIC_UTIL) \
-  $(LIBDYNAMIC_CRYPTO) \
-  $(LIBSECP256K1) \
-  $(LIBCRYPTOPP)
+#dynamic_tx_LDADD = \
+#  $(LIBUNIVALUE) \
+#  $(LIBDYNAMIC_COMMON) \
+#  $(LIBDYNAMIC_UTIL) \
+#  $(LIBDYNAMIC_CRYPTO) \
+#  $(LIBSECP256K1) \
+#  $(LIBCRYPTOPP)
 
-dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+#dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 # dynamicconsensus library #

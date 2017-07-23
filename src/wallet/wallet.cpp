@@ -113,7 +113,7 @@ const CWalletTx* CWallet::GetWalletTx(const uint256& hash) const
 CPubKey CWallet::GenerateNewKey(uint32_t nAccountIndex, bool fInternal)
 {
     AssertLockHeld(cs_wallet); // mapKeyMetadata
-    bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY); // default to compressed public keys if we want 0.6.0 wallets
+    bool fCompressed = false; // default to compressed public keys if we want 0.6.0 wallets
 
     CKey secret;
 
@@ -130,9 +130,9 @@ CPubKey CWallet::GenerateNewKey(uint32_t nAccountIndex, bool fInternal)
         secret.MakeNewKey(fCompressed);
 
         // Compressed public keys were introduced in version 0.6.0
-        if (fCompressed)
+        /* if (fCompressed)
             SetMinVersion(FEATURE_COMPRPUBKEY);
-
+		*/
         pubkey = secret.GetPubKey();
         assert(secret.VerifyPubKey(pubkey));
 
@@ -1718,6 +1718,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             CBlock block;
             ReadBlockFromDisk(block, pindex, Params().GetConsensus());
             BOOST_FOREACH(CTransaction& tx, block.vtx)
+            {
+                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
+                    ret++;
+            }
+            BOOST_FOREACH(CTransaction& tx, block.instructionTx)
             {
                 if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
                     ret++;

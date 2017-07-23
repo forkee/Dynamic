@@ -115,6 +115,8 @@ static const unsigned int AVG_INVENTORY_BROADCAST_INTERVAL = 5;
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 213333;
 /** Additional block download timeout per parallel downloading peer (i.e. 1.25 min) */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 100006;
+/** Dynamic: Minimum Output Transaction Amount Requirement */
+static const CAmount MIN_TXOUT_AMOUNT = MIN_TX_FEE;
 
 static const unsigned int DEFAULT_LIMITFREERELAY = 15;
 static const bool DEFAULT_RELAYPRIORITY = true;
@@ -139,13 +141,6 @@ static const bool DEFAULT_ENABLE_REPLACEMENT = false;
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 12;
 /** Maximum number of unconnecting headers announcements before DoS score */
 static const int MAX_UNCONNECTING_HEADERS = 10;
-
-//Dynamic Constants
-static const CAmount MIN_TXOUT_AMOUNT = MIN_TX_FEE;
-static const CAmount BLOCKCHAIN_INIT_REWARD = COIN * 0;
-static const CAmount PHASE_1_POW_REWARD = COIN * 1;
-static const CAmount PHASE_1_DYNODE_PAYMENT = COIN * 0.382;
-static const CAmount PHASE_2_DYNODE_PAYMENT = COIN * 0.618;
 
 struct BlockHasher
 {
@@ -267,9 +262,6 @@ std::string GetWarnings(const std::string& strFor);
 bool GetTransaction(const uint256 &hash, CTransaction &tx, const Consensus::Params& params, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, const CBlock* pblock = NULL);
-
-CAmount GetPoWBlockPayment(const int& nHeight, CAmount nFees);
-CAmount GetDynodePayment(bool fDynode = true);
 
 /**
  * Prune block and undo files (blk???.dat and undo???.dat) so that the disk space used is less than a user-defined target.

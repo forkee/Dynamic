@@ -444,7 +444,7 @@ public:
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
-        consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
+        consensus.powLimit = uint256S("0fffffff00000000000000000000000000000000000000000000000000000000");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // Dynamic: 24 hours
         consensus.nPowTargetSpacing = 2 * 64; // Dynamic: 256 seconds
         consensus.nPowMaxAdjustDown = 32; // Dynamic: 32% adjustment down
@@ -465,34 +465,40 @@ public:
         pchMessageStart[1] = 0x32;
         pchMessageStart[2] = 0x15;
         pchMessageStart[3] = 0x3f;
-        
+
         nMaxTipAge = 24 * 60 * 64;
         nDefaultPort = 31500;
         nPruneAfterHeight = 100;
         startNewChain = false;
 
-		int64_t nTime = GetTime();
+	int64_t nTime = GetTime();
+        genesis = CreateGenesisBlock(1491119086, 24051, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN)); // Genesis for sake of genesis, this must not be invoked!
+
+	bool fDebugTest = GetBoolArg("-debugtest", false);
+	arith_uint256 newhash = UintToArith256(uint256S("0x0000e20f2438413d8fc19ee8b45c4a89c8ab01a2bbc5a62ae1626e394278d1be"));
+
+	if (!fDebugTest) { //...
+	 } else {
         genesis = CreateGenesisBlock(nTime, 0, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
+	arith_uint256 besthash;
+	memset(&besthash,0xFF,32);
+	arith_uint256 hashTarget = UintToArith256(consensus.powLimit).GetCompact();
+	arith_uint256 newhash = UintToArith256(genesis.GetHash());
 
-		arith_uint256 besthash;
-		memset(&besthash,0xFF,32);
-		arith_uint256 hashTarget = UintToArith256(consensus.powLimit).GetCompact();
-		arith_uint256 newhash = UintToArith256(genesis.GetHash());
-
-		while (newhash > hashTarget) {
-			genesis.nNonce++;
-			if (genesis.nNonce == 0) {
-				++genesis.nTime;
-			}
-
-			if(newhash < besthash) {
-				besthash = newhash;
-			}
-			newhash = UintToArith256(genesis.GetHash());
+	while (newhash > hashTarget) {
+		genesis.nNonce++;
+		if (genesis.nNonce == 0) {
+			++genesis.nTime;
 		}
-		
-        consensus.hashGenesisBlock = ArithToUint256(newhash);
+		if(newhash < besthash) {
+			printf("New best: %s\n", newhash.GetHex().c_str());
+			besthash = newhash;
+		}
+		newhash = UintToArith256(genesis.GetHash());
+	}
 
+        consensus.hashGenesisBlock = ArithToUint256(newhash);
+}
         vFixedSeeds.clear(); //! Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();  //! Regtest mode doesn't have any DNS seeds.
 
@@ -505,7 +511,7 @@ public:
         nFulfilledRequestExpireTime = 5 * 60; // fulfilled requests expire in 5 minutes
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
-            (  0, newhash),
+            (  0, ArithToUint256(newhash)),
             genesis.nTime, // * UNIX timestamp of last checkpoint block
             0,    // * total number of transactions between genesis and last checkpoint
             //   (the tx=... number in the SetBestChain debug.log lines)

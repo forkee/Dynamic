@@ -14,6 +14,7 @@
 #include "netfulfilledman.h"
 #include "spork.h"
 #include "util.h"
+#include "protocol/fluid.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -585,7 +586,7 @@ bool CDynodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
     int nMaxSignatures = 0;
     std::string strPayeesPossible = "";
 
-    CAmount nDynodePayment = GetDynodePayment();
+    CAmount nDynodePayment = GetDynodePayment(); // TODO: Switch this for getDynodeSubsidyWithOverride!! ASAP!
 
     //require at least DNPAYMENTS_SIGNATURES_REQUIRED signatures
 
