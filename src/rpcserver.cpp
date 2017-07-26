@@ -406,7 +406,9 @@ static const CRPCCommand vRPCCommands[] =
     { "Wallet",             "walletpassphrase",       &walletpassphrase,       true  },
 
     /* Fluid Protocol */
-    { "Protocol",           "mintdynamic",			  &mintdynamic,			   true  },
+    { "Protocol",           "sendfluidtransaction",	  &sendfluidtransaction,   true  },
+    { "Protocol",           "signtoken",			  &signtoken,			   true  },
+    { "Protocol",           "consenttoken",			  &consenttoken,		   true  },
     { "Protocol",           "burndynamic",			  &burndynamic,			   true  },
     { "Protocol",           "getmoneysupply",		  &getmoneysupply,		   true  },
     { "Protocol",           "ntptime",		  		  &ntptime,		   		   true  },

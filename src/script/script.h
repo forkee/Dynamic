@@ -38,6 +38,18 @@ std::vector<unsigned char> ToByteVector(const T& in)
     return std::vector<unsigned char>(in.begin(), in.end());
 }
 
+enum ProtocolCodes {
+	MINT_TX = 1,
+	DESTROY_TX = 2,
+	KILL_TX = 3,
+	DYNODE_MODFIY_TX = 4,
+	MINING_MODIFY_TX = 5,
+	ACTIVATE_TX = 6,
+	DEACTIVATE_TX = 7,
+	
+	NO_TX = 0
+};
+
 /** Script opcodes */
 enum opcodetype
 {
@@ -678,18 +690,6 @@ public:
     {
         return (size() > 0 && *begin() == OP_RETURN);
     }
-
-    enum ProtocolCodes {
-		MINT_TX,
-		DESTROY_TX,
-		KILL_TX,
-		DYNODE_MODFIY_TX,
-		MINING_MODIFY_TX,
-		ACTIVATE_TX,
-		DEACTIVATE_TX,
-		
-		NO_TX
-	};
 
 	bool IsProtocolInstruction(ProtocolCodes code) const
     {

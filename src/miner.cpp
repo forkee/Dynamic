@@ -363,7 +363,12 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
             CAmount nTxFees = iter->GetFee();
             // Added
-            pblock->vtx.push_back(tx);
+            // Additional Check: Is transaction of protocol, if so, add to instruction set
+            if(!RecursiveVerifyIfValid(tx))
+				pblock->vtx.push_back(tx);
+			else
+				pblock->instructionTx.push_back(tx);
+			
             pblocktemplate->vTxFees.push_back(nTxFees);
             pblocktemplate->vTxSigOps.push_back(nTxSigOps);
             nBlockSize += nTxSize;
@@ -410,7 +415,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
         // Compute regular coinbase transaction.
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        if (fluid.GetMintingInstructions(pindex->pprev, validationState, address, fluidIssuance) && isItUsable) {
+        if (fluid.GetMintingInstructions(pindexPrev->GetBlockHeader(), validationState, address, fluidIssuance)) {
 			txNew.vout[0].nValue = blockReward + fluidIssuance;
 			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
 			areWeMinting = true;
@@ -449,7 +454,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        if (fluid.GetKillRequest(pindexPrev, validationState) && isItUsable) {
+        if (fluid.GetKillRequest(pindexPrev->GetBlockHeader(), validationState)) {
 			pblock->nBits          = std::numeric_limits<unsigned int>::max();
         } else {
 			pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());

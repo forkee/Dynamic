@@ -154,6 +154,7 @@ public:
 	CAmount nDynamicBurnt;
 	CAmount overridenBlockReward;
 	CAmount overridenDynodeReward;
+	std::vector<CTransaction> instructionTx;
 	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
@@ -176,6 +177,7 @@ public:
 		nDynamicBurnt = 0;
 		overridenBlockReward = 0;
 		overridenDynodeReward = 0;
+		instructionTx.clear();
 		
         nVersion       = 0;
         hashMerkleRoot = uint256();
@@ -198,6 +200,7 @@ public:
         nTime          = block.nTime;
         nBits          = block.nBits;
         nNonce         = block.nNonce;
+        instructionTx  = block.instructionTx;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -228,6 +231,7 @@ public:
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
+        block.instructionTx  = instructionTx;
         return block;
     }
 

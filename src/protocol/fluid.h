@@ -54,6 +54,14 @@ static const CAmount PHASE_2_DYNODE_PAYMENT = COIN * 0.618;
 //         787945786573733d
 //
 
+enum KeyNumber {
+	KEY_UNE,
+	KEY_DEUX,
+	KEY_TROIS,
+	
+	KEY_MAX
+};
+
 class Fluid {
 private:
 	CAmount DeriveSupplyPercentage(int64_t percentage, CBlockIndex* pindex);
@@ -98,17 +106,9 @@ private:
 	/*
 	 * The three keys controlling the multiple signature system
 	 */
-	std::string fluidPubkeyX = "0489da1b3ceab91599cf344babae29384e0eeefedfed9a56716eb6a4ec8b29079996ce27cc612b89cdeef7d4326d14e27e5d77c81e547110acefd998912b9b0b9a"; // 5KTRMPQLJqJmFQ5zFVxd4C8ws6YezrRpbxfCuufUfxLhzKYuPqJ
-	std::string fluidPubkeyY = "04c6f6728aa5ab30f55577610e283c7be54bef80380d19acec7f47ee0c7bf7d0cb164d8f22c45a5e8af4577d4ba254214cd06716504df26b780687861fff803e2c"; // 5J27YF8ECMfV6NKTSwhj4UQ9NDAwRngH5vrrdkW2dmMFvSHyCyB
-	std::string fluidPubkeyZ = "04a71372cd9291d1f14b998820922a8fe5b0a6636ea46dc8b969758baa6bca4485f285676b23d95497e7ab76f15de238d35f0c9aa266610f644d6ad0272e3c10b0"; // 5JacMzkr4DcCnnwiCu95eMKd1Nhod24cLD3i2PZF7oSn74R7FJy
-
-	enum KeyNumber {
-		KEY_UNE,
-		KEY_DEUX,
-		KEY_TROIS,
-		
-		KEY_MAX
-	};
+	std::string fluidAddressX = "DEmrYUjVeLQnuvLnZjqzCex9azDRAtPzUa"; // MnjEkYWghQhBqSQSixDGVPpzrtYWrg1s1BZVuvznK3SF7s5dRmzd
+	std::string fluidAddressY = "DM1sv8zT529d7rYPtGX5kKM2MjD8YrHg5D"; // Mn64HNSDehPY4KKP8bZCMvcweYS7wrNszNWGvPHamcyPhjoZABSp
+	std::string fluidAddressZ = "DKPH9BdcrVyWwRsUVbPtaUQSwJWv2AMrph"; // MpPYgqNRGf8qQqkuds6si6UEfpddfps1NJ1uTVbp7P3g3imJLwAC
 
 	enum OverrideType {
 		MINING_OVERRIDE,
@@ -124,67 +124,25 @@ public:
 	void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }
 
 	const char* fluidImportantAddress(KeyNumber adr) {
-		if (adr == KEY_UNE) { return fluidPubkeyX.c_str(); }
-		else if (adr == KEY_DEUX) { return fluidPubkeyY.c_str(); }
-		else if (adr == KEY_TROIS) { return fluidPubkeyZ.c_str(); }
-		else { return "Invalid Public Key Requested"; }
+		if (adr == KEY_UNE) { return (fluidAddressX.c_str()); }
+		else if (adr == KEY_DEUX) { return (fluidAddressY.c_str()); }
+		else if (adr == KEY_TROIS) { return (fluidAddressZ.c_str()); }
+		else { return "Invalid Address Requested"; }
 	}
 	
-	/*CDynamicAddress deriveMultisigAddress() {
-	
-	}*/
-	
-	CDynamicAddress sovreignAddress = "DDi79AEein1zEWsezqUKkFvLUjnbeS1Gbg"; // MmPzujU4zmjBzZpTxBr952Zyh6PETFhca1MPT5gGN8JrUeW3BuzJ
-	
-	CScript AssimilateMintingScript(CDynamicAddress reciever, CAmount howMuch) {
-		std::string issuanceString;
-		if(!GenerateFluidToken(reciever, howMuch, issuanceString))
-			return CScript() << OP_RETURN;
-		else return CScript() << OP_MINT << ParseHex(issuanceString);
-	}
-	
-	CScript AssimilateKillScript() {
-		std::string killToken;
-		if(!GenerateKillToken(killToken))
-			return CScript() << OP_RETURN;
-		else return CScript() << OP_KILL << ParseHex(killToken);
-	}
-	
-	CScript AssimiliateDestroyScript(CAmount howMuch) {
-		std::ostringstream oss; oss << howMuch; std::string r = oss.str(); 
-		ConvertToHex(r);
-		return CScript() << OP_DESTROY << ParseHex(r);
-	}
-		
-	CScript AssimilateOverrideToken(CAmount howMuch, OverrideType type) {
-		std::string issuanceString;
-		if (!GenericSignNumber(howMuch, issuanceString))
-			return CScript() << OP_RETURN;
-			
-		switch(type) {
-			case MINING_OVERRIDE:
-				return CScript() << OP_REWARD_MINING << ParseHex(issuanceString);
-			break;
-			case DYNODE_OVERRIDE:
-				return CScript() << OP_REWARD_DYNODE << ParseHex(issuanceString);
-			break;
-			default:
-				return CScript() << OP_RETURN;
-		}
-		return CScript() << OP_RETURN;
-	}
+	bool IsGivenKeyMaster(CDynamicAddress inputKey, int &whichOne);
+	bool HowManyKeysWeHave(CDynamicAddress inputKey, bool &keyOne, bool &keyTwo, bool &keyThree);
+	bool CheckIfQuorumExists(std::string token, std::string &message, bool individual = false);
+	bool GenericConsentMessage(std::string message, std::string &signedString, CDynamicAddress signer);
+	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
 
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);
-	bool SignIntimateMessage(CDynamicAddress address, std::string unsignedMessage, std::string &stitchedMessage);
+	bool SignIntimateMessage(CDynamicAddress address, std::string unsignedMessage, std::string &stitchedMessage, bool stitch = true);
 	
-	bool DerivePreviousBlockInformation(CBlock &block, CBlockIndex* fromDerive);
-	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
-	bool DeriveBlockInfoFromHash(CBlock &block, uint256 hash);
-	
-	bool GenericSignNumber(CAmount howMuch, std::string &signedString);
+	bool GenericSignMessage(std::string message, std::string &signedString, CDynamicAddress signer);
 	bool GenericParseNumber(std::string scriptString, CAmount &howMuch);
-	bool GenericVerifyInstruction(std::string uniqueIdentifier);
+	bool GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey /* Added so the token key can be intercepted */, int whereToLook=1);
 	
 	bool GenerateFluidToken(CDynamicAddress sendToward, 
 							CAmount tokenMintAmt, std::string &issuanceString);
@@ -192,14 +150,14 @@ public:
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
 	bool ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed);
 
-	bool GetMintingInstructions(CBlockHeader& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
-	void GetDestructionTxes(CBlockHeader& block, CValidationState& state, CAmount &amountDestroyed);
+	bool GetMintingInstructions(const CBlockHeader& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
+	void GetDestructionTxes(const CBlockHeader& block, CValidationState& state, CAmount &amountDestroyed);
 	
-	bool GenerateKillToken(std::string &killString);
-	bool GetKillRequest(CBlockHeader& block, CValidationState& state);
+	bool GenerateKillToken(std::string &killString, CDynamicAddress signer);
+	bool GetKillRequest(const CBlockHeader& block, CValidationState& state);
 	
-	bool GetProofOverrideRequest(CBlockHeader& block, CValidationState& state, CAmount &howMuch);
-	bool GetDynodeOverrideRequest(CBlockHeader& block, CValidationState& state, CAmount &howMuch);
+	bool GetProofOverrideRequest(const CBlockHeader& block, CValidationState& state, CAmount &howMuch);
+	bool GetDynodeOverrideRequest(const CBlockHeader& block, CValidationState& state, CAmount &howMuch);
 };
 
 /** Standard Reward Payment Determination Functions */
@@ -209,6 +167,11 @@ CAmount GetDynodePayment(bool fDynode = true);
 /** Override Logic Switch for Reward Payment Determination Functions */
 CAmount getBlockSubsidyWithOverride(const int& nHeight, CAmount nFees, CAmount lastOverrideCommand);
 CAmount getDynodeSubsidyWithOverride(CAmount lastOverrideCommand, bool fDynode = true);
+
+bool RecursiveVerifyIfValid(const CTransaction& tx);
+bool CheckInstruction(const CTransaction& tx, CValidationState &state);
+
+opcodetype getOpcodeFromString(std::string input);
 
 extern Fluid fluid;
 

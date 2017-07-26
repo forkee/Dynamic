@@ -361,8 +361,11 @@ extern UniValue invalidateblock(const UniValue& params, bool fHelp);
 extern UniValue reconsiderblock(const UniValue& params, bool fHelp);
 extern UniValue getspentinfo(const UniValue& params, bool fHelp);
 
-extern UniValue mintdynamic(const UniValue& params, bool fHelp); // in protocol/fluid.cpp
+extern UniValue sendfluidtransaction(const UniValue& params, bool fHelp); // in protocol/fluid.cpp
 extern UniValue burndynamic(const UniValue& params, bool fHelp);
+extern UniValue signtoken(const UniValue& params, bool fHelp);
+extern UniValue consenttoken(const UniValue& params, bool fHelp);
+extern UniValue getrawpubkey(const UniValue& params, bool fHelp);
 
 bool StartRPC();
 void InterruptRPC();

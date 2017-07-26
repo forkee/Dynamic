@@ -64,7 +64,8 @@ if BUILD_DYNAMICD
 endif
 
 if BUILD_DYNAMIC_UTILS
-  bin_PROGRAMS += dynamic-cli dynamic-tx
+  bin_PROGRAMS += dynamic-cli
+#dynamic-tx
 endif
 
 .PHONY: FORCE check-symbols check-security
