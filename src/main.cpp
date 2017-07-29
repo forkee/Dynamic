@@ -3349,23 +3349,19 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
 
 	// Get override reward transactions from the network
-	// getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward)
-	// GetDynodePayment(fDynodePaid, pindex->pprev->overridenDynodeReward)
+	CAmount newReward = 0, newDynodeReward = 0;
+	if (!fluid.GetProofOverrideRequest(pindex->pprev->GetBlockHeader(), validationState, newReward)) {
+			pindex->overridenBlockReward = (pindex->pprev? pindex->pprev->overridenBlockReward : 0);
+	} else {
+			pindex->overridenBlockReward = newReward;
+	}
+	 
+	if (!fluid.GetDynodeOverrideRequest(pindex->pprev->GetBlockHeader(), validationState, newDynodeReward)) {
+	 		pindex->overridenDynodeReward = (pindex->pprev? pindex->pprev->overridenDynodeReward : 0);
+	} else {
+	 		pindex->overridenDynodeReward = newDynodeReward;
+	}
 	
-	/*
-	 * if (!fluid.GetBlockOverrideTxes(pindex->pprev, validationState, newReward) {
-	 * 		pindex->overridenBlockReward = (pindex->pprev? pindex->pprev->overridenBlockReward : 0);
-	 * } else {
-	 * 		pindex->overridenBlockReward = newReward;
-	 * }
-	 * 
-	 * if (!fluid.GetDynodeOverrideTxes(pindex->pprev, validationState, newDynodeReward) {
-	 * 		pindex->overridenDynodeReward = (pindex->pprev? pindex->pprev->overridenDynodeReward : 0);
-	 * } else {
-	 * 		pindex->overridenDynodeReward = newDynodeReward;
-	 * }
-	 */
-		
     // END DYNAMIC
 
     if (!control.Wait())
@@ -4342,7 +4338,7 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
         if (!CheckInstruction(tx, state))
             return state.DoS(50, error("CheckBlockHeader(): Incorrect protocol instructions!"),
 							 REJECT_INVALID, "bad-instruction");
-
+	
     // Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),

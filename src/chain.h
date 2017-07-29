@@ -150,11 +150,13 @@ public:
     unsigned int nTime;
     unsigned int nBits;
     unsigned int nNonce;
+	std::vector<CTransaction> instructionTx;
+
+	//! DynamicX Protocol Inferences from Master Addresses and External Functions
 	CAmount nMoneySupply;
 	CAmount nDynamicBurnt;
 	CAmount overridenBlockReward;
 	CAmount overridenDynodeReward;
-	std::vector<CTransaction> instructionTx;
 	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;

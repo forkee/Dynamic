@@ -62,8 +62,8 @@ bool RecursiveVerifyIfValid(const CTransaction& tx) {
 	CAmount nFluidTransactions = 0;
 	BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
-		if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) ||
-			// txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) || // These transactions don't affect consensus, it can be ignored!
+		if ((txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && tx.IsCoinBase()) || // These transactions don't affect consensus, it can be ignored! (unless it is a coinbase transaction)
+			txout.scriptPubKey.IsProtocolInstruction(MINT_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(KILL_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX) ||
@@ -71,6 +71,7 @@ bool RecursiveVerifyIfValid(const CTransaction& tx) {
 			txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX))
 			nFluidTransactions++;
 	}
+	LogPrintf("There are %s number of transactions.\n", std::to_string(nFluidTransactions));
 	return (nFluidTransactions != 0);
 }
 
@@ -183,7 +184,7 @@ bool Fluid::SignIntimateMessage(CDynamicAddress address, std::string unsignedMes
 		return false;
 	else
 		if(stitch)
-			stitchedMessage = unsignedMessage + " " + EncodeBase64(&vchSig[0], vchSig.size());
+			stitchedMessage = unsignedMessage + "~" + EncodeBase64(&vchSig[0], vchSig.size());
 		else
 			stitchedMessage = EncodeBase64(&vchSig[0], vchSig.size());
 	
@@ -243,7 +244,7 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 		return false;
 	
 	// Now actually append our new digest to the existing signed string
-	signedString = message + " " + digest;
+	signedString = message + "~" + digest;
 	
 	ConvertToHex(signedString);
 
@@ -254,7 +255,7 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
 	std::vector<std::string> transverser;
-	boost::split(transverser, scriptString, boost::is_any_of(" "));
+	boost::split(transverser, scriptString, boost::is_any_of("~"));
 	scriptString = transverser.at(1);
 	
 	// Step 1.2: Convert new Hex Data to dehexed amount
@@ -327,7 +328,7 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 {
 	messageTokenKey = "";
 	std::vector<std::string> transverser;
-	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
+	boost::split(transverser, uniqueIdentifier, boost::is_any_of("~"));
 	uniqueIdentifier = transverser.at(1);
 	CDynamicAddress addr(signer);
     
@@ -339,7 +340,7 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 
 	ConvertToString(uniqueIdentifier);
 	std::vector<std::string> strs;
-	boost::split(strs, uniqueIdentifier, boost::is_any_of(" "));
+	boost::split(strs, uniqueIdentifier, boost::is_any_of("~"));
 		
 	messageTokenKey = strs.at(0);
    	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Message Token Key is %s \n", messageTokenKey);
@@ -388,7 +389,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::vector<std::string> transverser;
-	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
+	boost::split(transverser, uniqueIdentifier, boost::is_any_of("~"));
 	uniqueIdentifier = transverser.at(1);
 	
 	// Step 1.2: Convert new Hex Data to dehexed token
@@ -398,7 +399,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	// Step 2: Convert the Dehexed Token to sense
 	std::vector<std::string> strs, ptrs;
 	std::string::size_type size, sizeX;
-	boost::split(strs, dehexString, boost::is_any_of(" "));
+	boost::split(strs, dehexString, boost::is_any_of("~"));
 	boost::split(ptrs, strs.at(0), boost::is_any_of("::"));
 	
 	// Step 3: Convert the token to our variables
@@ -443,7 +444,7 @@ bool Fluid::GetMintingInstructions(const CBlockHeader& block, CValidationState& 
 bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_DESTROY from Hex
 	std::vector<std::string> transverser;
-	boost::split(transverser, scriptString, boost::is_any_of(" "));
+	boost::split(transverser, scriptString, boost::is_any_of("~"));
 	scriptString = transverser.at(1);
 	
 	// Step 1.2: Convert new Hex Data to dehexed amount
@@ -461,8 +462,8 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 		return false;
 	}
 	
-	if (coinsSpent != coinsDestroyed) {
-		LogPrintf("Fluid::ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy!\n");
+	if (coinsDestroyed != coinsSpent) {
+		LogPrintf("Fluid::ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy! Amount is %s claimed destroyed vs %s actually spent\n", std::to_string(coinsDestroyed), std::to_string(coinsSpent));
 		return false;
 	}
 	
@@ -760,8 +761,8 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
             "consenttoken \"address\" \"tokenkey\"\n"
             "\nGive consent to a Fluid Protocol Token as a second party\n"
             "\nArguments:\n"
-            "1. \"address\"         (string, required) The Dynamic Address which will be used to sign.\n"
-            "2. \"tokenkey\"         (string, required) The token which has to be initially signed\n"
+            "1. \"address\"         (string, required) The Dynamic Address which will be used to give consent.\n"
+            "2. \"tokenkey\"         (string, required) The token which has to be been signed by one party\n"
             "\nExamples:\n"
             + HelpExampleCli("consenttoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
             + HelpExampleRpc("consenttoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
@@ -796,7 +797,29 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
 	return result;
 }
 
+/* Pretty pointless function, but - meh */
+UniValue stringtohex(const UniValue& params, bool fHelp)
+{
+	std::string result;
 
+    if (fHelp || params.size() != 1)
+        throw std::runtime_error(
+            "stringtohex \"string\"\n"
+            "\nConvert String to Hexadecimal Format\n"
+            "\nArguments:\n"
+            "1. \"string\"         (string, required) String that has to be converted to hex.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("stringtohex", "\"Hello World!\"")
+            + HelpExampleRpc("stringtohex", "\"Hello World!\"")
+        );
+	
+	result = params[0].get_str();
+	
+	fluid.ConvertToHex(result);
+	return result;
+}
+
+/*
 bool Fluid::DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive) {
     uint256 hash = fromDerive->GetBlockHash();
 
@@ -820,3 +843,4 @@ bool Fluid::DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fro
     return true;
 }
 
+*/

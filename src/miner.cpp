@@ -200,6 +200,10 @@ bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet,
     return true;
 }
 
+CScript AssimilateScriptFeeBurn(std::string feeString) {
+	return CScript() << OP_DESTROY << ParseHex(feeString.c_str());
+}
+
 std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn)
 {
     // Create new block
@@ -210,10 +214,13 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
     // Create coinbase tx with fluid issuance
     // TODO: Can this be made any more elegant?
-    CMutableTransaction txNew;
+    CMutableTransaction txNew, fluidBurnFees;
     txNew.vin.resize(1);
     txNew.vin[0].prevout.SetNull();
     txNew.vout.resize(1);
+    fluidBurnFees.vin.resize(1);
+    fluidBurnFees.vin[0].prevout.SetNull();
+    fluidBurnFees.vout.resize(1);
 
     // Largest block you're willing to create:
     unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
@@ -258,6 +265,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
         // Add our coinbase tx as first transaction
         pblock->vtx.push_back(txNew);
+        pblock->instructionTx.push_back(fluidBurnFees);
         pblocktemplate->vTxFees.push_back(-1); // updated at end
         pblocktemplate->vTxSigOps.push_back(-1); // updated at end
         pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
@@ -415,16 +423,23 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
         // Compute regular coinbase transaction.
         txNew.vout[0].scriptPubKey = scriptPubKeyIn;
+        // Compute fluid fee flushing
+        std::string feeString = std::to_string(nFees);
+        fluid.ConvertToHex(feeString);
+        fluidBurnFees.vout[0].scriptPubKey = AssimilateScriptFeeBurn(feeString);
+        fluidBurnFees.vout[0].nValue = nFees;
+
         if (fluid.GetMintingInstructions(pindexPrev->GetBlockHeader(), validationState, address, fluidIssuance)) {
-			txNew.vout[0].nValue = blockReward + fluidIssuance;
+			txNew.vout[0].nValue = blockReward + fluidIssuance - nFees;
 			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
 			areWeMinting = true;
 		} else {
-			txNew.vout[0].nValue = blockReward;
+			txNew.vout[0].nValue = blockReward - nFees;
 			LogPrintf("FluidMinting: Previous block does not contain any minting instructions, continuing with block creation\n");
 		}
 		
         txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
+        fluidBurnFees.vin[0].scriptSig = CScript() << nHeight << OP_0;      
 
         if (areWeMinting) {
             // Pick out the amount of issuance
@@ -433,7 +448,6 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 			assert(address.IsValid());	
 			CScript script = GetScriptForDestination(address.Get());
 
-			LogPrintf("FluidMinting: Created transaction script for block, script: %s\n", ScriptToAsmStr(script));
             txNew.vout.push_back(CTxOut(fluidIssuance, script));
 		}
 
@@ -449,6 +463,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
 
         // Update block coinbase
         pblock->vtx[0] = txNew;
+        pblock->instructionTx[0] = fluidBurnFees;
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header

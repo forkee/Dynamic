@@ -55,11 +55,11 @@ static const CAmount PHASE_2_DYNODE_PAYMENT = COIN * 0.618;
 //
 
 enum KeyNumber {
-	KEY_UNE,
-	KEY_DEUX,
-	KEY_TROIS,
+	KEY_UNE = 1,
+	KEY_DEUX = 2,
+	KEY_TROIS = 3,
 	
-	KEY_MAX
+	KEY_MAX = 0
 };
 
 class Fluid {
@@ -106,9 +106,9 @@ private:
 	/*
 	 * The three keys controlling the multiple signature system
 	 */
-	std::string fluidAddressX = "DEmrYUjVeLQnuvLnZjqzCex9azDRAtPzUa"; // MnjEkYWghQhBqSQSixDGVPpzrtYWrg1s1BZVuvznK3SF7s5dRmzd
-	std::string fluidAddressY = "DM1sv8zT529d7rYPtGX5kKM2MjD8YrHg5D"; // Mn64HNSDehPY4KKP8bZCMvcweYS7wrNszNWGvPHamcyPhjoZABSp
-	std::string fluidAddressZ = "DKPH9BdcrVyWwRsUVbPtaUQSwJWv2AMrph"; // MpPYgqNRGf8qQqkuds6si6UEfpddfps1NJ1uTVbp7P3g3imJLwAC
+	std::string defaultFluidAddressX = "DEmrYUjVeLQnuvLnZjqzCex9azDRAtPzUa"; // MnjEkYWghQhBqSQSixDGVPpzrtYWrg1s1BZVuvznK3SF7s5dRmzd
+	std::string defaultFluidAddressY = "DM1sv8zT529d7rYPtGX5kKM2MjD8YrHg5D"; // Mn64HNSDehPY4KKP8bZCMvcweYS7wrNszNWGvPHamcyPhjoZABSp
+	std::string defaultFluidAddressZ = "DKPH9BdcrVyWwRsUVbPtaUQSwJWv2AMrph"; // MpPYgqNRGf8qQqkuds6si6UEfpddfps1NJ1uTVbp7P3g3imJLwAC
 
 	enum OverrideType {
 		MINING_OVERRIDE,
@@ -134,7 +134,7 @@ public:
 	bool HowManyKeysWeHave(CDynamicAddress inputKey, bool &keyOne, bool &keyTwo, bool &keyThree);
 	bool CheckIfQuorumExists(std::string token, std::string &message, bool individual = false);
 	bool GenericConsentMessage(std::string message, std::string &signedString, CDynamicAddress signer);
-	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
+//	bool DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive);
 
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);

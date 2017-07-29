@@ -24,6 +24,10 @@
 
 #include "chainparamsseeds.h"
 
+CScript AssimilateFirstPubKey() {
+	return CScript() << OP_DESTROY << ParseHex("3530303030");
+}
+
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, const uint32_t nTime, const uint32_t nNonce, const uint32_t nBits, const int32_t nVersion, const CAmount& genesisReward)
 {
     CMutableTransaction txNew;
@@ -34,12 +38,22 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
     txNew.vout[0].nValue = genesisReward;
     txNew.vout[0].scriptPubKey = genesisOutputScript;
 
+	/* Fluid Transaction must be present! */
+    CMutableTransaction txFluid;
+    txNew.nVersion = 1;
+    txNew.vin.resize(1);
+    txNew.vout.resize(1);
+    txNew.vin[0].scriptSig = CScript() << 1489862748 << CScriptNum(4) << std::vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
+    txNew.vout[0].nValue = 50000;
+    txNew.vout[0].scriptPubKey = AssimilateFirstPubKey();
+
     CBlock genesis;
     genesis.nTime    = nTime;
     genesis.nBits    = nBits;
     genesis.nNonce   = nNonce;
     genesis.nVersion = nVersion;
     genesis.vtx.push_back(txNew);
+    genesis.instructionTx.push_back(txNew);
     genesis.hashPrevBlock.SetNull();
     genesis.hashMerkleRoot = BlockMerkleRoot(genesis);
     return genesis;
@@ -160,21 +174,20 @@ public:
         nPruneAfterHeight = 20545;
         startNewChain = false;
 
-        genesis = CreateGenesisBlock(1499355306, 340833, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
+        genesis = CreateGenesisBlock(1501359789, 1200315, UintToArith256(consensus.powLimit).GetCompact(), 1, (1 * COIN));
         if(startNewChain == true) { MineGenesis(genesis, consensus.powLimit, true); }
-
         consensus.hashGenesisBlock = genesis.GetHash();
-        		
-        if(!startNewChain) {
-            assert(consensus.hashGenesisBlock == uint256S("0x00000df2b2de73959b61e66e8bd0f54a1e2e790c248edf61bd302e99f2336024"));
-            assert(genesis.hashMerkleRoot == uint256S("0x5ba0a842fae652d9e7a855619cafe34e94f1d5bfab1c32b8ee977db89d3fd754"));
-		}
-		
-        vSeeds.push_back(CDNSSeedData("dnsseeder.io", "dyn.dnsseeder.io"));
-        vSeeds.push_back(CDNSSeedData("dnsseeder.com", "dyn.dnsseeder.com"));
-        vSeeds.push_back(CDNSSeedData("dnsseeder.host", "dyn.dnsseeder.host"));
-        vSeeds.push_back(CDNSSeedData("dnsseeder.net", "dyn.dnsseeder.net"));
 
+        if(!startNewChain) {
+            assert(consensus.hashGenesisBlock == uint256S("0x00000db78790d934f1ff4a288c13614cbc3c49b4ea033f2399674788456df125"));
+            assert(genesis.hashMerkleRoot == uint256S("0x7e6be4141131da3668d22bb38c82517fbf6880ed9ee4f3eba934c08a25be769a"));
+		}
+		/*
+			vSeeds.push_back(CDNSSeedData("dnsseeder.io", "dyn.dnsseeder.io"));
+			vSeeds.push_back(CDNSSeedData("dnsseeder.com", "dyn.dnsseeder.com"));
+			vSeeds.push_back(CDNSSeedData("dnsseeder.host", "dyn.dnsseeder.host"));
+			vSeeds.push_back(CDNSSeedData("dnsseeder.net", "dyn.dnsseeder.net"));
+		*/
         base58Prefixes[PUBKEY_ADDRESS] 	= base58Prefixes[PUBKEY_ADDRESS_DYN] 	= std::vector<unsigned char>(1,30);
 										  base58Prefixes[PUBKEY_ADDRESS_SEQ] 	= std::vector<unsigned char>(1,63);
         base58Prefixes[SCRIPT_ADDRESS] 	= base58Prefixes[SCRIPT_ADDRESS_DYN] 	= std::vector<unsigned char>(1,10);

@@ -366,6 +366,8 @@ extern UniValue burndynamic(const UniValue& params, bool fHelp);
 extern UniValue signtoken(const UniValue& params, bool fHelp);
 extern UniValue consenttoken(const UniValue& params, bool fHelp);
 extern UniValue getrawpubkey(const UniValue& params, bool fHelp);
+extern UniValue verifyquorum(const UniValue& params, bool fHelp);
+extern UniValue stringtohex(const UniValue& params, bool fHelp);
 
 bool StartRPC();
 void InterruptRPC();

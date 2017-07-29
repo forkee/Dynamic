@@ -247,8 +247,6 @@ UniValue stop(const UniValue& params, bool fHelp)
     return "Dynamic server stopping";
 }
 
-extern UniValue verifyquorum(const UniValue& params, bool fHelp);
-
 /**
  * Call Table
  */
@@ -416,7 +414,8 @@ static const CRPCCommand vRPCCommands[] =
     { "Protocol",           "ntptime",		  		  &ntptime,		   		   true  },
     { "Protocol",           "getrawpubkey",	 		  &getrawpubkey,		   true  },
     { "Protocol",           "verifyquorum",	 		  &verifyquorum,		   true  },
-    
+    { "Protocol",           "stringtohex",	 		  &stringtohex,		   true  },
+
     /* Syscoin-ported DynamicX Protocol */
     { "Identity",           "identitynew",		  	  &identitynew,		  	  	true  },
     { "Identity",           "identityupdate",		  &identityupdate,		  	true  },

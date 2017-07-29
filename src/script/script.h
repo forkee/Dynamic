@@ -691,6 +691,10 @@ public:
         return (size() > 0 && *begin() == OP_RETURN);
     }
 
+	bool IsItDestroyTransaction() {
+		return (size() > 0 && *begin() == OP_DESTROY);
+	}
+
 	bool IsProtocolInstruction(ProtocolCodes code) const
     {
 		switch(code) {
