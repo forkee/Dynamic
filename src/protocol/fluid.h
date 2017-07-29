@@ -90,7 +90,7 @@ private:
 	std::string HexToString(std::string in) {
 		std::string output;
 		if ((in.length() % 2) != 0) {
-			throw std::runtime_error("String is not valid length ...");
+			throw std::runtime_error("Provided Hex String is not valid");
 		}
 			size_t cnt = in.length() / 2;
 			for (size_t i = 0; cnt > i; ++i) {

@@ -277,7 +277,10 @@ bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 
 /** Checks whether as to parties have actually signed it */
 bool Fluid::CheckIfQuorumExists(std::string token, std::string &message, bool individual) {
-	message = ""; // Initialise
+	/* Done to match the desires of our instruction verification system */
+	CScript tokenToScript = CScript() << 0xc1 << ParseHex(token);
+	std::string tokenToString = ScriptToAsmStr(tokenToScript); token = tokenToString; message = "";
+
 	bool addressOneConsents, addressTwoConsents, addressThreeConsents;
 	
 	if (!GenericVerifyInstruction(token, fluidImportantAddress(KEY_UNE), message, 1))
@@ -325,20 +328,27 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 	messageTokenKey = "";
 	std::vector<std::string> transverser;
 	boost::split(transverser, uniqueIdentifier, boost::is_any_of(" "));
-	uniqueIdentifier = transverser.at(whereToLook);
+	uniqueIdentifier = transverser.at(1);
 	CDynamicAddress addr(signer);
     
-    CKeyID keyID;
+    LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Split Token is %s \n", uniqueIdentifier);
+	
+	CKeyID keyID;
     if (!addr.GetKeyID(keyID))
 		return false;
 
 	ConvertToString(uniqueIdentifier);
 	std::vector<std::string> strs;
 	boost::split(strs, uniqueIdentifier, boost::is_any_of(" "));
-	
+		
 	messageTokenKey = strs.at(0);
    	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Message Token Key is %s \n", messageTokenKey);
-	std::string digestSignature = strs.at(1);
+	
+	/* Don't even bother looking there there aren't enough digest keys or we are checking in the wrong place */
+	if(whereToLook >= (int)strs.size() || whereToLook == 0)
+		return false;
+	
+	std::string digestSignature = strs.at(whereToLook);
    	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Digest Signature is %s \n", digestSignature);
 
     bool fInvalid = false;
@@ -571,7 +581,7 @@ UniValue getrawpubkey(const UniValue& params, bool fHelp)
     {
         CTxDestination dest = address.Get();
         CScript scriptPubKey = GetScriptForDestination(dest);
-        ret.push_back(HexStr(scriptPubKey.begin(), scriptPubKey.end()));
+        ret.push_back(Pair("pubkey", HexStr(scriptPubKey.begin(), scriptPubKey.end())));
 	} else {
 		ret.push_back(Pair("errors", "Dynamic address is not valid!"));
 	}
@@ -650,7 +660,7 @@ UniValue sendfluidtransaction(const UniValue& params, bool fHelp)
             "\Send Fluid transactions to the network\n"
             "\nArguments:\n"
             "1. \"opcode\"  (string, required) The Fluid operation to be executed.\n"
-            "2. \"account\" (string, required) The information for that opearation.\n"
+            "2. \"hexstring\" (string, required) The token for that opearation.\n"
             "\nExamples:\n"
             + HelpExampleCli("sendfluidtransaction", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
             + HelpExampleRpc("sendfluidtransaction", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\", \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
@@ -663,6 +673,9 @@ UniValue sendfluidtransaction(const UniValue& params, bool fHelp)
     
 	if (negatif == opcode)
 		throw std::runtime_error("OP_CODE is either not a Fluid OP_CODE or is invalid");
+
+    if(!IsHex(params[1].get_str()))
+		throw std::runtime_error("Hex isn't even valid!");    
 	else
 		finalScript = CScript() << opcode << ParseHex(params[1].get_str());
 
@@ -705,6 +718,10 @@ UniValue signtoken(const UniValue& params, bool fHelp)
 		throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address is not possessed by wallet!");
 
 	std::string r = params[1].get_str();
+
+    if(!IsHex(r))
+		throw std::runtime_error("Hex isn't even valid! Cannot process ahead...");
+
 	fluid.ConvertToString(r);
 	
 	if (!fluid.GenericSignMessage(r, result, address))
@@ -713,11 +730,32 @@ UniValue signtoken(const UniValue& params, bool fHelp)
     return result;
 }
 
+UniValue verifyquorum(const UniValue& params, bool fHelp)
+{
+	std::string message;
+	
+    if (fHelp || params.size() != 1)
+        throw std::runtime_error(
+            "verifyquorum \"tokenkey\"\n"
+            "\nVerify if the token provided has required quorum\n"
+            "\nArguments:\n"
+            "1. \"tokenkey\"         (string, required) The token which has to be initially signed\n"
+            "\nExamples:\n"
+            + HelpExampleCli("consenttoken", "\"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
+            + HelpExampleRpc("consenttoken", "\"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
+        );
+	
+    if (!fluid.CheckIfQuorumExists(params[0].get_str(), message, false))
+		throw std::runtime_error("Instruction does not meet minimum quorum for validity");
+
+    return "Quorum is present!";
+}
+
 UniValue consenttoken(const UniValue& params, bool fHelp)
 {
 	std::string result;
 
-    if (fHelp || params.size() != 1)
+    if (fHelp || params.size() != 2)
         throw std::runtime_error(
             "consenttoken \"address\" \"tokenkey\"\n"
             "\nGive consent to a Fluid Protocol Token as a second party\n"
@@ -728,7 +766,6 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
             + HelpExampleCli("consenttoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
             + HelpExampleRpc("consenttoken", "\"D5nRy9Tf7Zsef8gMGL2fhWA9ZslrP4K5tf\" \"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
         );
-	//..
 	
     CDynamicAddress address(params[0].get_str());
     if (!address.IsValid())
@@ -753,7 +790,10 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
 	if (!fluid.GenericConsentMessage(params[1].get_str(), result, address))
 		throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Message signing failed");
     
-    return result;
+    if (!fluid.CheckIfQuorumExists(result, message, false))
+		throw std::runtime_error("Quorum Signature cannot be from the same address twice");
+
+	return result;
 }
 
 
