@@ -79,7 +79,7 @@ bool RecursiveVerifyIfValid(const CTransaction& tx) {
 	CAmount nFluidTransactions = 0;
 	BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
-		if ((txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && tx.IsCoinBase()) || // These transactions don't affect consensus, it can be ignored! (unless it is a coinbase transaction)
+		if (// (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && tx.IsCoinBase()) ||
 			txout.scriptPubKey.IsProtocolInstruction(MINT_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX) ||
@@ -196,30 +196,11 @@ bool Fluid::SignIntimateMessage(CDynamicAddress address, std::string unsignedMes
 		return false;
 	else
 		if(stitch)
-			stitchedMessage = unsignedMessage + "~" + EncodeBase64(&vchSig[0], vchSig.size());
+			stitchedMessage = StitchString(unsignedMessage, EncodeBase64(&vchSig[0], vchSig.size()), false);
 		else
 			stitchedMessage = EncodeBase64(&vchSig[0], vchSig.size());
 	
 	return true;
-}
-
-/** Simple numerical collation with hex conversion, create a bland token */
-bool Fluid::GenerateFluidToken(CDynamicAddress sendToward, 
-						CAmount tokenMintAmt, std::string &issuanceString) {
-
-	if(!sendToward.IsValid())
-		return false;
-
-	if(tokenMintAmt < fluidMintingMinimum || tokenMintAmt > fluidMintingMaximum) {
-		LogPrintf("Fluid::GenerateFluidToken: Token Mint Quantity is either too big or too small, %s \n", tokenMintAmt);
-		return false;
-	}
-	
-	std::string r = std::to_string(tokenMintAmt) + "::" + std::to_string(GetTime()) + "::" + sendToward.ToString();
-	
-	ConvertToHex(r);
-
-    return true;
 }
 
 /** It will perform basic message signing functions */
@@ -241,7 +222,7 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 		return false;
 	
 	// Is the consent message consented by one of the parties already?
-	if(!CheckIfQuorumExists(message, token, true))
+	if(!CheckNonScriptQuorum(message, token, true))
 		return false;
 	
 	// Token cannot be empty
@@ -256,7 +237,7 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 		return false;
 	
 	// Now actually append our new digest to the existing signed string
-	signedString = message + "~" + digest;
+	signedString = StitchString(message, digest, false);
 	
 	ConvertToHex(signedString);
 
@@ -266,16 +247,13 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 /** It gets a number from the ASM of an OP_CODE without signature verification */
 bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
-	std::vector<std::string> transverser;
-	boost::split(transverser, scriptString, boost::is_any_of("~"));
-	scriptString = transverser.at(1);
-	
+	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	// Step 1.2: Convert new Hex Data to dehexed amount
 	std::string dehexString = HexToString(scriptString);
 	scriptString = dehexString;
 	
 	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
-	std::string lr = scriptString; std::string::iterator end_pos = std::remove(lr.begin(), lr.end(), ' '); lr.erase(end_pos, lr.end());
+	std::string lr = scriptString; ScrubString(lr, true);
 	
 	try {
 		howMuch			= boost::lexical_cast<int64_t>(lr);
@@ -288,12 +266,14 @@ bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	return true;
 }
 
-/** Checks whether as to parties have actually signed it */
-bool Fluid::CheckIfQuorumExists(std::string token, std::string &message, bool individual) {
-	/* Done to match the desires of our instruction verification system */
-	CScript tokenToScript = CScript() << 0xc1 << ParseHex(token);
-	std::string tokenToString = ScriptToAsmStr(tokenToScript); token = tokenToString; message = "";
+/** Checks whether as to parties have actually signed it - please use this with ones **without** the OP_CODE */
+bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message) {
+	std::string result = "12345 " + token;
+	return CheckIfQuorumExists(token, message, false);
+}
 
+/** Checks whether as to parties have actually signed it - please use this with ones with the OP_CODE */
+bool Fluid::CheckIfQuorumExists(std::string token, std::string &message, bool individual) {
 	bool addressOneConsents, addressTwoConsents, addressThreeConsents;
 	
 	if (!GenericVerifyInstruction(token, fluidImportantAddress(KEY_UNE), message, 1))
@@ -337,11 +317,8 @@ bool Fluid::CheckIfQuorumExists(std::string token, std::string &message, bool in
 
 /** Individually checks the validity of an instruction */
 bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey, int whereToLook)
-{
-	messageTokenKey = "";
-	std::vector<std::string> transverser;
-	boost::split(transverser, uniqueIdentifier, boost::is_any_of("~"));
-	uniqueIdentifier = transverser.at(1);
+{	
+	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r; messageTokenKey = ""; 	std::vector<std::string> strs;
 	CDynamicAddress addr(signer);
     
     LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Split Token is %s \n", uniqueIdentifier);
@@ -351,9 +328,8 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 		return false;
 
 	ConvertToString(uniqueIdentifier);
-	std::vector<std::string> strs;
-	boost::split(strs, uniqueIdentifier, boost::is_any_of("~"));
-		
+	SeperateString(uniqueIdentifier, strs, false);
+
 	messageTokenKey = strs.at(0);
    	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Message Token Key is %s \n", messageTokenKey);
 	
@@ -392,31 +368,26 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 }
 
 bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
-	// Step 0: Check if token matches the two/three quorum required
+	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
+	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r;
+	
+	// Step 1.1.1: Check if our key matches the required quorum
 	std::string message;
-	if (!CheckIfQuorumExists(uniqueIdentifier, message)) {
+	if (!CheckNonScriptQuorum(uniqueIdentifier, message)) {
 		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
 		return false;
 	}
-	
-	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
-	std::vector<std::string> transverser;
-	boost::split(transverser, uniqueIdentifier, boost::is_any_of("~"));
-	uniqueIdentifier = transverser.at(1);
-	
+		
 	// Step 1.2: Convert new Hex Data to dehexed token
 	std::string dehexString = HexToString(uniqueIdentifier);
 	uniqueIdentifier = dehexString;
 	
 	// Step 2: Convert the Dehexed Token to sense
-	std::vector<std::string> strs, ptrs;
-	std::string::size_type size, sizeX;
-	boost::split(strs, dehexString, boost::is_any_of("~"));
-	boost::split(ptrs, strs.at(0), boost::is_any_of("::"));
+	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
 	
 	// Step 3: Convert the token to our variables
-	std::string lr = ptrs.at(0); std::string::iterator end_pos = std::remove(lr.begin(), lr.end(), ' '); lr.erase(end_pos, lr.end());
-	std::string ls = ptrs.at(2); std::string::iterator end_posX = std::remove(ls.begin(), ls.end(), ' '); ls.erase(end_posX, ls.end());
+	std::string lr = ptrs.at(0); ScrubString(lr, true); 
+	std::string ls = ptrs.at(2); ScrubString(ls, true);
 	
 	try {
 		coinAmount			 	= boost::lexical_cast<CAmount>(lr);
@@ -429,7 +400,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	std::string recipientAddress = ptrs.at(4);
 	destination.SetString(recipientAddress);
 		
-	if(!destination.IsValid() || coinAmount < fluidMintingMinimum || coinAmount > fluidMintingMaximum)
+	if(!destination.IsValid())
 		return false;
 	
 	return true;
@@ -459,16 +430,14 @@ bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationS
 
 bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_DESTROY from Hex
-	std::vector<std::string> transverser;
-	boost::split(transverser, scriptString, boost::is_any_of("~"));
-	scriptString = transverser.at(1);
+	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r;
 	
 	// Step 1.2: Convert new Hex Data to dehexed amount
 	std::string dehexString = HexToString(scriptString);
 	scriptString = dehexString;
 	
 	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
-	std::string lr = scriptString; std::string::iterator end_pos = std::remove(lr.begin(), lr.end(), ' '); lr.erase(end_pos, lr.end());
+	std::string lr = scriptString; ScrubString(lr, true); 
 	
 	try {
 		coinsDestroyed			= boost::lexical_cast<int64_t>(lr);
@@ -614,7 +583,7 @@ CAmount GetPoWBlockPayment(const int& nHeight, CAmount nFees)
 	
 	LogPrint("creation", "GetPoWBlockPayment() : create=%s PoW Reward=%d\n", FormatMoney(nSubsidy+nFees), nSubsidy+nFees);
 
-	return nSubsidy /* + nFees */; // Consensus Critical: Network fees are burnt to become coinbase for Fluid Instruction Txes
+	return nSubsidy  + nFees;
 }
 
 CAmount GetDynodePayment(bool fDynode)
@@ -757,7 +726,7 @@ UniValue verifyquorum(const UniValue& params, bool fHelp)
             + HelpExampleRpc("consenttoken", "\"3130303030303030303030303a3a313439393336353333363a3a445148697036443655376d46335761795a32747337794478737a71687779367a5a6a20494f42447a557167773\"")
         );
 	
-    if (!fluid.CheckIfQuorumExists(params[0].get_str(), message, false))
+    if (!fluid.CheckNonScriptQuorum(params[0].get_str(), message, false))
 		throw std::runtime_error("Instruction does not meet minimum quorum for validity");
 
     return "Quorum is present!";
@@ -796,13 +765,13 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
 
 	std::string message;
 
-    if (!fluid.CheckIfQuorumExists(params[1].get_str(), message, true))
+    if (!fluid.CheckNonScriptQuorum(params[1].get_str(), message, true))
 		throw std::runtime_error("Instruction does not meet minimum quorum for validity");
 
 	if (!fluid.GenericConsentMessage(params[1].get_str(), result, address))
 		throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Message signing failed");
     
-    if (!fluid.CheckIfQuorumExists(result, message, false))
+    if (!fluid.CheckNonScriptQuorum(result, message, false))
 		throw std::runtime_error("Quorum Signature cannot be from the same address twice");
 
 	return result;

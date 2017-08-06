@@ -147,5 +147,6 @@ void SeperateString(std::string input, std::vector<std::string> output, bool sub
 std::string StitchString(std::string stringOne, std::string stringTwo, bool subDelimiter = false);
 std::string StitchString(std::string stringOne, std::string stringTwo, std::string stringThree, bool subDelimiter = false);
 int64_t stringToInteger(std::string input);
+std::string getRidOfScriptStatement(std::string input);
 
 #endif // AUXILLARY_PROTOCOL_H

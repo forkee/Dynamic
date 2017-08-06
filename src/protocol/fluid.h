@@ -81,6 +81,7 @@ public:
 	bool HowManyKeysWeHave(CDynamicAddress inputKey, bool &keyOne, bool &keyTwo, bool &keyThree);
 	bool CheckIfQuorumExists(std::string token, std::string &message, bool individual = false);
 	bool GenericConsentMessage(std::string message, std::string &signedString, CDynamicAddress signer);
+	bool CheckNonScriptQuorum(std::string token, std::string &message);
 
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);
@@ -90,9 +91,6 @@ public:
 	bool GenericParseNumber(std::string scriptString, CAmount &howMuch);
 	bool GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey /* Added so the token key can be intercepted */, int whereToLook=1);
 	
-	bool GenerateFluidToken(CDynamicAddress sendToward, 
-							CAmount tokenMintAmt, std::string &issuanceString);
-
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
 	bool ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed);
 

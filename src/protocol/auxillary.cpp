@@ -68,6 +68,13 @@ int64_t stringToInteger(std::string input) {
 	return stoi(input);
 }
 
+std::string getRidOfScriptStatement(std::string input) {
+	std::vector<std::string> output;
+	boost::split(output, input, boost::is_any_of(' '));
+	
+	return output.at(1);
+}
+
 /*
 * Base64 encoding/decoding (RFC1341)
 * Copyright (c) 2005-2011, Jouni Malinen <j@w1.fi>
