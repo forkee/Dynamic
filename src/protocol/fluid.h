@@ -81,7 +81,7 @@ public:
 	bool HowManyKeysWeHave(CDynamicAddress inputKey, bool &keyOne, bool &keyTwo, bool &keyThree);
 	bool CheckIfQuorumExists(std::string token, std::string &message, bool individual = false);
 	bool GenericConsentMessage(std::string message, std::string &signedString, CDynamicAddress signer);
-	bool CheckNonScriptQuorum(std::string token, std::string &message);
+	bool CheckNonScriptQuorum(std::string token, std::string &message, bool individual = false);
 
 	bool IsItHardcoded(std::string givenScriptPubKey);
 	bool InitiateFluidVerify(CDynamicAddress dynamicAddress);

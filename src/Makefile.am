@@ -81,6 +81,7 @@ DYNAMIC_CORE_H = \
   protocol/offer.h \
   protocol/fluid.h \
   protocol/duality.h \
+  protocol/auxillary.h \
   activedynode.h \
   addressindex.h \
   spentindex.h \
@@ -226,6 +227,7 @@ libdynamic_server_a_SOURCES = \
   protocol/offer.cpp \
   protocol/fluid.cpp \
   protocol/duality.cpp \
+  protocol/auxillary.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \

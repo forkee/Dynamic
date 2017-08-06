@@ -70,7 +70,7 @@ int64_t stringToInteger(std::string input) {
 
 std::string getRidOfScriptStatement(std::string input) {
 	std::vector<std::string> output;
-	boost::split(output, input, boost::is_any_of(' '));
+	boost::split(output, input, boost::is_any_of(" "));
 	
 	return output.at(1);
 }

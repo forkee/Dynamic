@@ -255,21 +255,15 @@ bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
 	std::string lr = scriptString; ScrubString(lr, true);
 	
-	try {
-		howMuch			= boost::lexical_cast<int64_t>(lr);
-	}
-	catch( boost::bad_lexical_cast const& ) {
-		LogPrintf("Fluid::ParseDestructionAmount: Variable is invalid!\n");
-		return false;
-	}
+	howMuch			= stringToInteger(lr);
 
 	return true;
 }
 
 /** Checks whether as to parties have actually signed it - please use this with ones **without** the OP_CODE */
-bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message) {
+bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message, bool individual) {
 	std::string result = "12345 " + token;
-	return CheckIfQuorumExists(token, message, false);
+	return CheckIfQuorumExists(token, message, individual);
 }
 
 /** Checks whether as to parties have actually signed it - please use this with ones with the OP_CODE */
@@ -318,7 +312,7 @@ bool Fluid::CheckIfQuorumExists(std::string token, std::string &message, bool in
 /** Individually checks the validity of an instruction */
 bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey, int whereToLook)
 {	
-	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r; messageTokenKey = ""; 	std::vector<std::string> strs;
+	std::string r = getRidOfScriptStatement(uniqueIdentifier); uniqueIdentifier = r; messageTokenKey = ""; 	std::vector<std::string> strs;
 	CDynamicAddress addr(signer);
     
     LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Split Token is %s \n", uniqueIdentifier);
@@ -369,7 +363,7 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 
 bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
-	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r;
+	std::string r = getRidOfScriptStatement(uniqueIdentifier); uniqueIdentifier = r;
 	
 	// Step 1.1.1: Check if our key matches the required quorum
 	std::string message;
@@ -389,13 +383,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	std::string lr = ptrs.at(0); ScrubString(lr, true); 
 	std::string ls = ptrs.at(2); ScrubString(ls, true);
 	
-	try {
-		coinAmount			 	= boost::lexical_cast<CAmount>(lr);
-	}
-	catch( boost::bad_lexical_cast const& ) {
-		LogPrintf("Fluid::ParseMintKey: Either amount string or issuance time string are incorrect! Parsing cannot continue!\n");
-		return false;
-	}
+	coinAmount			 	= stringToInteger(lr);
 
 	std::string recipientAddress = ptrs.at(4);
 	destination.SetString(recipientAddress);
@@ -430,7 +418,7 @@ bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationS
 
 bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_DESTROY from Hex
-	std::string r = getRidOfScriptStatement(uniqueIdentifier); scriptString = r;
+	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	
 	// Step 1.2: Convert new Hex Data to dehexed amount
 	std::string dehexString = HexToString(scriptString);
@@ -439,14 +427,8 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
 	std::string lr = scriptString; ScrubString(lr, true); 
 	
-	try {
-		coinsDestroyed			= boost::lexical_cast<int64_t>(lr);
-	}
-	catch( boost::bad_lexical_cast const& ) {
-		LogPrintf("Fluid::ParseDestructionAmount: Coins destroyed amount is invalid!\n");
-		return false;
-	}
-	
+	coinsDestroyed			= stringToInteger(lr);
+
 	if (coinsDestroyed != coinsSpent) {
 		LogPrintf("Fluid::ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy! Amount is %s claimed destroyed vs %s actually spent\n", std::to_string(coinsDestroyed), std::to_string(coinsSpent));
 		return false;

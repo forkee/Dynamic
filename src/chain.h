@@ -156,6 +156,7 @@ public:
 	CAmount nDynamicBurnt;
 	CAmount overridenBlockReward;
 	CAmount overridenDynodeReward;
+	std::vector<std::string> bannedAddresses; /// Compiler complains about using CDynamicAddress
 	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
@@ -178,6 +179,7 @@ public:
 		nDynamicBurnt = 0;
 		overridenBlockReward = 0;
 		overridenDynodeReward = 0;
+		bannedAddresses.clear();
 		
         nVersion       = 0;
         hashMerkleRoot = uint256();
@@ -345,6 +347,7 @@ public:
 		READWRITE(nDynamicBurnt);
 		READWRITE(overridenBlockReward);
 		READWRITE(overridenDynodeReward);
+		READWRITE(bannedAddresses);
     }
 
     uint256 GetBlockHash() const

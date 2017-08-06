@@ -454,11 +454,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        if (fluid.GetKillRequest(pindexPrev->GetBlockHeader(), validationState)) {
-			pblock->nBits          = std::numeric_limits<unsigned int>::max();
-        } else {
-			pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
-        }
+		pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce         = 0;
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
