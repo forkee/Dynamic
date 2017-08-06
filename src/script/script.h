@@ -9,6 +9,7 @@
 #include "crypto/common.h"
 
 #include "prevector.h"
+#include "protocol/auxillary.h"
 
 #include <assert.h>
 #include <climits>
@@ -37,18 +38,6 @@ std::vector<unsigned char> ToByteVector(const T& in)
 {
     return std::vector<unsigned char>(in.begin(), in.end());
 }
-
-enum ProtocolCodes {
-	MINT_TX = 1,
-	DESTROY_TX = 2,
-	KILL_TX = 3,
-	DYNODE_MODFIY_TX = 4,
-	MINING_MODIFY_TX = 5,
-	ACTIVATE_TX = 6,
-	DEACTIVATE_TX = 7,
-	
-	NO_TX = 0
-};
 
 /** Script opcodes */
 enum opcodetype
@@ -225,9 +214,8 @@ enum opcodetype
 	OP_REWARD_DYNODE = 0xc3,
 	OP_REWARD_MINING = 0xc4,
 	OP_STERILIZE = 0xc5,
-	OP_KILL = 0xc6,
-	OP_FLUID_DEACTIVATE = 0xc7,
-	OP_FLUID_REACTIVATE = 0xc8,
+	OP_FLUID_DEACTIVATE = 0xc6,
+	OP_FLUID_REACTIVATE = 0xc7,
 	
     // template matching params
     OP_SMALLINTEGER = 0xfa,
@@ -703,9 +691,6 @@ public:
 				break;
 			case DESTROY_TX:
 				return (size() > 0 && *begin() == OP_DESTROY);
-				break;
-			case KILL_TX:
-				return (size() > 0 && *begin() == OP_KILL);
 				break;
 			case DYNODE_MODFIY_TX:
 				return (size() > 0 && *begin() == OP_REWARD_DYNODE);

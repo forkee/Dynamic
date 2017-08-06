@@ -30,12 +30,6 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
     
-    // The default block verification system for headers does not allow for the first verification
-    // of transactions - which in turn prohibits the ability to intercept, verify and act on transactions
-    // executed by the protocol, this will only allow the protocol transactions to be in the block, it won't
-    // make the block to heavy (sighs)
-    std::vector<CTransaction> instructionTx;
-
     CBlockHeader()
     {
         SetNull();
@@ -52,7 +46,6 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
-        READWRITE(instructionTx);
     }
 
     void SetNull()
@@ -63,7 +56,6 @@ public:
         nTime = 0;
         nBits = 0;
         nNonce = 0;
-        instructionTx.clear();
     }
 
     bool IsNull() const
@@ -131,7 +123,6 @@ public:
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
-        block.instructionTx  = instructionTx;
         
         return block;
     }

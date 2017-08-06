@@ -44,6 +44,24 @@ extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CA
 
 Fluid fluid;
 
+bool getBlockFromHeader(const CBlockHeader& blockHeader, CBlock &block) {
+	uint256 hash = blockHeader.GetHash();
+	
+    if (mapBlockIndex.count(hash) == 0)
+        return false;
+
+    CBlockIndex* pblockindex = mapBlockIndex[hash];
+
+	/* This should never happen */
+    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+        return false;
+
+    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        return false;
+	
+	return true;
+}
+
 opcodetype getOpcodeFromString(std::string input) {
     if ("OP_MINT") return OP_MINT;
 	else if ("OP_DESTROY") return OP_DESTROY;
@@ -51,7 +69,6 @@ opcodetype getOpcodeFromString(std::string input) {
 	else if ("OP_REWARD_DYNODE") return OP_REWARD_DYNODE;
 	else if ("OP_REWARD_MINING") return OP_REWARD_MINING;
 	else if ("OP_STERILIZE") return OP_STERILIZE;
-	else if ("OP_KILL") return OP_KILL;
 	else if ("OP_FLUID_DEACTIVATE") return OP_FLUID_DEACTIVATE;
 	else if ("OP_FLUID_REACTIVATE") return OP_FLUID_REACTIVATE;
 	
@@ -64,7 +81,6 @@ bool RecursiveVerifyIfValid(const CTransaction& tx) {
     {
 		if ((txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && tx.IsCoinBase()) || // These transactions don't affect consensus, it can be ignored! (unless it is a coinbase transaction)
 			txout.scriptPubKey.IsProtocolInstruction(MINT_TX) ||
-			txout.scriptPubKey.IsProtocolInstruction(KILL_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX) ||
 			txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX) ||
@@ -79,10 +95,6 @@ bool CheckInstruction(const CTransaction& tx, CValidationState &state) {
 	return RecursiveVerifyIfValid(tx) && CheckTransaction(tx, state);
 }
 
-CAmount Fluid::DeriveSupplyPercentage(int64_t percentage, CBlockIndex* pindex) {
-	int64_t supply = pindex->nMoneySupply;
-	return supply * percentage / 100;
-}
 
 /** Checks if any given address is a master key, and if so, which one */
 bool Fluid::IsGivenKeyMaster(CDynamicAddress inputKey, int &whichOne) {
@@ -423,8 +435,12 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	return true;
 }
 
-bool Fluid::GetMintingInstructions(const CBlockHeader& block, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
-    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
+bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
+	CBlock block; 
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX)) {
 				std::string message;
@@ -470,10 +486,13 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	return true;
 }
 
-void Fluid::GetDestructionTxes(const CBlockHeader& block, CValidationState& state, CAmount &amountDestroyed) {
-	CAmount parseToDestroy = 0;
-	amountDestroyed = 0;
-    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
+void Fluid::GetDestructionTxes(const CBlockHeader& blockHeader, CValidationState& state, CAmount &amountDestroyed) {
+	CBlock block; 
+	CAmount parseToDestroy = 0; amountDestroyed = 0;
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX)) {
 				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, parseToDestroy)) {
@@ -519,24 +538,12 @@ UniValue burndynamic(const UniValue& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
-bool Fluid::GetKillRequest(const CBlockHeader& block, CValidationState& state) {
-    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
-		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
-			if (txout.scriptPubKey.IsProtocolInstruction(KILL_TX)) {
-				std::string message;
-				if (CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-					/* We must never reach here! */
-					throw std::runtime_error("Network Suicide Transaction has been executed! Client will not continue!");
-				else
-					return false;
-			}
-		}
-	}
-	return false;
-}
-
-bool Fluid::GetProofOverrideRequest(const CBlockHeader& block, CValidationState& state, CAmount &howMuch) {
-    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
+bool Fluid::GetProofOverrideRequest(const CBlockHeader& blockHeader, CValidationState& state, CAmount &howMuch) {
+	CBlock block; 
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)) {
 				std::string message;
@@ -548,8 +555,12 @@ bool Fluid::GetProofOverrideRequest(const CBlockHeader& block, CValidationState&
 	return false;
 }
 
-bool Fluid::GetDynodeOverrideRequest(const CBlockHeader& block, CValidationState& state, CAmount &howMuch) {
-    BOOST_FOREACH(const CTransaction& tx, block.instructionTx) {
+bool Fluid::GetDynodeOverrideRequest(const CBlockHeader& blockHeader, CValidationState& state, CAmount &howMuch) {
+	CBlock block; 
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
 			if (txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)) {
 				std::string message;
@@ -818,29 +829,3 @@ UniValue stringtohex(const UniValue& params, bool fHelp)
 	fluid.ConvertToHex(result);
 	return result;
 }
-
-/*
-bool Fluid::DerivePreviousBlockInformation(CBlock &block, const CBlockIndex* fromDerive) {
-    uint256 hash = fromDerive->GetBlockHash();
-
-    if (mapBlockIndex.count(hash) == 0) {
-      	LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - block does not exist!, hash: %s\n", hash.ToString());
-        return false;
-    }
-    
-    CBlockIndex* pblockindex = mapBlockIndex[hash];
-
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0) {
-		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block due to pruning, hash: %s\n", hash.ToString());
-        return false;
-	}
-    
-    if(!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus())) {
-		LogPrintf("Fluid::DerivePreviousBlockInformation: Failed in extracting block - unable to read database, hash: %s\n", hash.ToString());
-        return false;
-	}
-	
-    return true;
-}
-
-*/
