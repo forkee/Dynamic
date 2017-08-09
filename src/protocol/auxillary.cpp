@@ -38,7 +38,7 @@ void ScrubString(std::string &input, bool forInteger) {
 		input.erase(std::remove(input.begin(), input.end(), ' '), input.end());
 }
 
-void SeperateString(std::string input, std::vector<std::string> output, bool subDelimiter) {
+void SeperateString(std::string input, std::vector<std::string> &output, bool subDelimiter) {
 	if(subDelimiter)
 		boost::split(output, input, boost::is_any_of(SubDelimiter));
 	else

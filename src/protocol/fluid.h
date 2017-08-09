@@ -42,8 +42,8 @@
 class CBlock;
 class CBlockTemplate;
 
-static const CAmount BLOCKCHAIN_INIT_REWARD = COIN * 0;
-static const CAmount PHASE_1_POW_REWARD = COIN * 1;
+static const CAmount BLOCKCHAIN_INIT_REWARD = COIN * 1;
+static const CAmount PHASE_1_POW_REWARD = COIN * 1.5;
 static const CAmount PHASE_1_DYNODE_PAYMENT = COIN * 0.382;
 static const CAmount PHASE_2_DYNODE_PAYMENT = COIN * 0.618;
 
@@ -89,6 +89,7 @@ public:
 	
 	bool GenericSignMessage(std::string message, std::string &signedString, CDynamicAddress signer);
 	bool GenericParseNumber(std::string scriptString, CAmount &howMuch);
+	bool GenericParseHash(std::string scriptString, uint256 &hash);
 	bool GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey /* Added so the token key can be intercepted */, int whereToLook=1);
 	
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
@@ -109,8 +110,14 @@ CAmount GetDynodePayment(bool fDynode = true);
 CAmount getBlockSubsidyWithOverride(const int& nHeight, CAmount nFees, CAmount lastOverrideCommand);
 CAmount getDynodeSubsidyWithOverride(CAmount lastOverrideCommand, bool fDynode = true);
 
+/** Check procedures */
 bool RecursiveVerifyIfValid(const CTransaction& tx);
 bool CheckInstruction(const CTransaction& tx, CValidationState &state);
+
+/** Address banning system */
+bool CheckIfAddressIsBlacklisted(CScript scriptPubKey);
+bool RemoveEntry(std::string getBanInstruction, std::vector<uint256>& bannedList);
+bool ProcessBanEntry(std::string getBanInstruction, std::vector<uint256>& bannedList);
 
 opcodetype getOpcodeFromString(std::string input);
 

@@ -37,6 +37,7 @@
 #include "fluid.h"
 #include "main.h"
 
+#include <algorithm>
 #include <univalue.h>
 
 extern bool EnsureWalletIsAvailable(bool avoidException);
@@ -246,8 +247,16 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 
 /** It gets a number from the ASM of an OP_CODE without signature verification */
 bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
-	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
+	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
+	
+	// Step 1.1.1: Check if our key matches the required quorum
+	std::string message;
+	if (!CheckNonScriptQuorum(scriptString, message)) {
+		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
+		return false;
+	}
+	
 	// Step 1.2: Convert new Hex Data to dehexed amount
 	std::string dehexString = HexToString(scriptString);
 	scriptString = dehexString;
@@ -260,10 +269,36 @@ bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	return true;
 }
 
+bool Fluid::GenericParseHash(std::string scriptString, uint256 &hash) {
+	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
+	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
+	
+	// Step 1.1.1: Check if our key matches the required quorum
+	std::string message;
+	if (!CheckNonScriptQuorum(scriptString, message)) {
+		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
+		return false;
+	}
+	
+	// Step 1.2: Convert new Hex Data to dehexed token
+	std::string dehexString = HexToString(scriptString);
+	scriptString = dehexString;
+	
+	// Step 2: Convert the Dehexed Token to sense
+	std::vector<std::string> strs, ptrs; 
+	SeperateString(dehexString, strs, false);
+	scriptString = strs.at(0);
+	
+	// Step 3: Get hash
+	hash = uint256S(scriptString);
+	
+	return true;
+}
+
 /** Checks whether as to parties have actually signed it - please use this with ones **without** the OP_CODE */
 bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message, bool individual) {
 	std::string result = "12345 " + token;
-	return CheckIfQuorumExists(token, message, individual);
+	return CheckIfQuorumExists(result, message, individual);
 }
 
 /** Checks whether as to parties have actually signed it - please use this with ones with the OP_CODE */
@@ -314,9 +349,6 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 {	
 	std::string r = getRidOfScriptStatement(uniqueIdentifier); uniqueIdentifier = r; messageTokenKey = ""; 	std::vector<std::string> strs;
 	CDynamicAddress addr(signer);
-    
-    LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Split Token is %s \n", uniqueIdentifier);
-	
 	CKeyID keyID;
     if (!addr.GetKeyID(keyID))
 		return false;
@@ -325,14 +357,12 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
 	SeperateString(uniqueIdentifier, strs, false);
 
 	messageTokenKey = strs.at(0);
-   	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Message Token Key is %s \n", messageTokenKey);
 	
 	/* Don't even bother looking there there aren't enough digest keys or we are checking in the wrong place */
 	if(whereToLook >= (int)strs.size() || whereToLook == 0)
 		return false;
 	
 	std::string digestSignature = strs.at(whereToLook);
-   	LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Digest Signature is %s \n", digestSignature);
 
     bool fInvalid = false;
     std::vector<unsigned char> vchSig = DecodeBase64(digestSignature.c_str(), &fInvalid);
@@ -779,4 +809,80 @@ UniValue stringtohex(const UniValue& params, bool fHelp)
 	
 	fluid.ConvertToHex(result);
 	return result;
+}
+
+bool CheckIfAddressIsBlacklisted(CScript scriptPubKey) {
+	/* Step 1: Copy vector */
+	std::vector<uint256> bannedDatabase;
+	if (chainActive.Height() <= 10)
+		return false;
+	else bannedDatabase = chainActive.Tip()->bannedAddresses;
+	
+	CTxDestination source;
+	/* Step 2: Get destination */
+	if (ExtractDestination(scriptPubKey, source)){
+			/* Step 3: Hash it */
+			CDynamicAddress addressSource(source);
+			std::string address = addressSource.ToString();
+			uint256 identiferHash = Hash(address.begin(), address.end());
+			
+			/* Step 4: Check for each offending entry */
+			BOOST_FOREACH(const uint256& offendingHash, bannedDatabase)
+			{
+				/* Step 5: Do the hashes match? If so, return true */
+				if (offendingHash == identiferHash) {
+					return true;
+				}
+			}
+	}
+	/* Step 6: Address is not banned */
+	return false;
+}
+
+bool ProcessBanEntry(std::string getBanInstruction, std::vector<uint256>& bannedList) {
+	uint256 entry;
+	std::string one = fluid.fluidImportantAddress(KEY_UNE), two = fluid.fluidImportantAddress(KEY_DEUX), three = fluid.fluidImportantAddress(KEY_TROIS);
+	/* Can we get hash to insert? */
+	if (!fluid.GenericParseHash(getBanInstruction, entry))
+		return false;
+	
+	/* Is it already there? */
+	BOOST_FOREACH(const uint256& offendingHash, bannedList)
+	{
+		if (offendingHash == entry) {
+			return false;
+			/* You can't jsut ban the hodl addresses */
+		} else if ( entry == Hash(one.begin(), one.end()) ||
+					entry == Hash(two.begin(), two.end()) ||
+					entry == Hash(three.begin(), three.end()) ) {
+			return false;
+		}
+	}
+	
+	/* Okay, it's not there, so it's fine */
+	bannedList.push_back(entry);
+	
+	/* It's true */
+	return true;
+}
+
+bool RemoveEntry(std::string getBanInstruction, std::vector<uint256>& bannedList) {
+	uint256 entry;
+	
+	/* Can we get hash to insert? */
+	if (!fluid.GenericParseHash(getBanInstruction, entry))
+		return false;
+	
+	/* Is it already there? */
+	BOOST_FOREACH(const uint256& offendingHash, bannedList)
+	{
+		/* Check if there */
+		if (offendingHash == entry) {
+			/* Wipe entry reference off the map */
+			bannedList.erase(std::remove(bannedList.begin(), bannedList.end(), entry), bannedList.end());
+			return true;
+		}
+	}
+	
+	return false;
 }

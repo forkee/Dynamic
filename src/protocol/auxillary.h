@@ -142,7 +142,7 @@ public:
 
 /* String Manipulation Functions */
 void ScrubString(std::string &input, bool forInteger = false);
-void SeperateString(std::string input, std::vector<std::string> output, bool subDelimiter = false);
+void SeperateString(std::string input, std::vector<std::string> &output, bool subDelimiter = false);
 std::string StitchString(std::string stringOne, std::string stringTwo, bool subDelimiter = false);
 std::string StitchString(std::string stringOne, std::string stringTwo, std::string stringThree, bool subDelimiter = false);
 int64_t stringToInteger(std::string input);

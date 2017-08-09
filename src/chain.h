@@ -156,7 +156,7 @@ public:
 	CAmount nDynamicBurnt;
 	CAmount overridenBlockReward;
 	CAmount overridenDynodeReward;
-	std::vector<std::string> bannedAddresses; /// Compiler complains about using CDynamicAddress
+	std::vector<uint256> bannedAddresses;
 	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;

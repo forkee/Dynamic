@@ -1068,13 +1068,16 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 			) {
 			std::string message;
 			if (!fluid.CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
 		}
 
 		if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX)) {
 			if (!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-auth-failure");
 		}
+		
+		if (CheckIfAddressIsBlacklisted(txout.scriptPubKey))
+			return state.DoS(100, false, REJECT_INVALID, "bad-txns-output-banned-address");
     }
 
     // Check for duplicate inputs
