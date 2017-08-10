@@ -37,13 +37,19 @@ extern ProtocolToken SubDelimiter;
 extern ProtocolToken SignatureDelimiter;
 
 /* Identification Codes */
-static const int IDENTIFIER_NO_TX = 0;
-static const int IDENTIFIER_MINT_TX = 1;
-static const int IDENTIFIER_DESTROY_TX = 2;
-static const int IDENTIFIER_DYNODE_MODFIY_TX = 4;
-static const int IDENTIFIER_MINING_MODIFY_TX = 5;
-static const int IDENTIFIER_ACTIVATE_TX = 6;
-static const int IDENTIFIER_DEACTIVATE_TX = 7;
+static const int IDENTIFIER_NO_TX 					= 0;
+
+static const int IDENTIFIER_MINT_TX 				= 1;
+static const int IDENTIFIER_DESTROY_TX 				= 2;
+
+static const int IDENTIFIER_DYNODE_MODFIY_TX 		= 3;
+static const int IDENTIFIER_MINING_MODIFY_TX 		= 4;
+
+static const int IDENTIFIER_ACTIVATE_TX 			= 5;
+static const int IDENTIFIER_DEACTIVATE_TX 			= 6;
+
+static const int IDENTIFIER_REALLOW_TX 				= 7;
+static const int IDENTIFIER_STERILIZE_TX 			= 8;
 
 enum KeyNumber {
 	KEY_UNE = 1,
@@ -60,6 +66,8 @@ enum ProtocolCodes {
 	MINING_MODIFY_TX 	= IDENTIFIER_MINING_MODIFY_TX,
 	ACTIVATE_TX 		= IDENTIFIER_ACTIVATE_TX,
 	DEACTIVATE_TX 		= IDENTIFIER_DEACTIVATE_TX,
+	REALLOW_TX			= IDENTIFIER_REALLOW_TX,
+	STERILIZE_TX		= IDENTIFIER_STERILIZE_TX,
 	
 	NO_TX = IDENTIFIER_NO_TX
 };

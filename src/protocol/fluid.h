@@ -88,8 +88,8 @@ public:
 	bool SignIntimateMessage(CDynamicAddress address, std::string unsignedMessage, std::string &stitchedMessage, bool stitch = true);
 	
 	bool GenericSignMessage(std::string message, std::string &signedString, CDynamicAddress signer);
-	bool GenericParseNumber(std::string scriptString, CAmount &howMuch);
-	bool GenericParseHash(std::string scriptString, uint256 &hash);
+	bool GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch);
+	bool GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash);
 	bool GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey /* Added so the token key can be intercepted */, int whereToLook=1);
 	
 	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
@@ -110,14 +110,12 @@ CAmount GetDynodePayment(bool fDynode = true);
 CAmount getBlockSubsidyWithOverride(const int& nHeight, CAmount nFees, CAmount lastOverrideCommand);
 CAmount getDynodeSubsidyWithOverride(CAmount lastOverrideCommand, bool fDynode = true);
 
-/** Check procedures */
-bool RecursiveVerifyIfValid(const CTransaction& tx);
-bool CheckInstruction(const CTransaction& tx, CValidationState &state);
-
 /** Address banning system */
+void AddRemoveBanAddresses(const CBlockHeader& blockHeader, std::vector<uint256> &bannedList);
+/** Subfunctions */
 bool CheckIfAddressIsBlacklisted(CScript scriptPubKey);
-bool RemoveEntry(std::string getBanInstruction, std::vector<uint256>& bannedList);
-bool ProcessBanEntry(std::string getBanInstruction, std::vector<uint256>& bannedList);
+bool ProcessBanEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList);
+bool RemoveEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList);
 
 opcodetype getOpcodeFromString(std::string input);
 

@@ -45,6 +45,12 @@ extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CA
 
 Fluid fluid;
 
+/** Checks whether as to parties have actually signed it - please use this with ones **without** the OP_CODE */
+bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message, bool individual) {
+	std::string result = "12345 " + token;
+	return CheckIfQuorumExists(result, message, individual);
+}
+
 bool getBlockFromHeader(const CBlockHeader& blockHeader, CBlock &block) {
 	uint256 hash = blockHeader.GetHash();
 	
@@ -75,27 +81,6 @@ opcodetype getOpcodeFromString(std::string input) {
 	
 	return OP_RETURN;
 };
-
-bool RecursiveVerifyIfValid(const CTransaction& tx) {
-	CAmount nFluidTransactions = 0;
-	BOOST_FOREACH(const CTxOut& txout, tx.vout)
-    {
-		if (// (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && tx.IsCoinBase()) ||
-			txout.scriptPubKey.IsProtocolInstruction(MINT_TX) ||
-			txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
-			txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX) ||
-			txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX) ||
-			txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX))
-			nFluidTransactions++;
-	}
-	LogPrintf("There are %s number of transactions.\n", std::to_string(nFluidTransactions));
-	return (nFluidTransactions != 0);
-}
-
-bool CheckInstruction(const CTransaction& tx, CValidationState &state) {
-	return RecursiveVerifyIfValid(tx) && CheckTransaction(tx, state);
-}
-
 
 /** Checks if any given address is a master key, and if so, which one */
 bool Fluid::IsGivenKeyMaster(CDynamicAddress inputKey, int &whichOne) {
@@ -246,11 +231,11 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 }
 
 /** It gets a number from the ASM of an OP_CODE without signature verification */
-bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
+bool Fluid::GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	
-	// Step 1.1.1: Check if our key matches the required quorum
+	// Step 1.1: Check if our key matches the required quorum
 	std::string message;
 	if (!CheckNonScriptQuorum(scriptString, message)) {
 		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
@@ -261,15 +246,26 @@ bool Fluid::GenericParseNumber(std::string scriptString, CAmount &howMuch) {
 	std::string dehexString = HexToString(scriptString);
 	scriptString = dehexString;
 	
-	// Step 2: Take string and apply lexical cast to convert it to CAmount (int64_t)
-	std::string lr = scriptString; ScrubString(lr, true);
+	// Step 2: Convert the Dehexed Token to sense
+	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
 	
-	howMuch			= stringToInteger(lr);
+	if(1 >= (int)strs.size())
+		return false;
+	
+	// Step 3: Convert the token to our variables
+	std::string lr = ptrs.at(0); ScrubString(lr, true); 
+	std::string ls = ptrs.at(1); ScrubString(ls, true);
+	
+	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
+	if (timeStamp > stringToInteger(ls) + 5 * 60)
+		return false;
+	
+	howMuch			 	= stringToInteger(lr);
 
 	return true;
 }
 
-bool Fluid::GenericParseHash(std::string scriptString, uint256 &hash) {
+bool Fluid::GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash) {
 	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
 	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	
@@ -285,20 +281,23 @@ bool Fluid::GenericParseHash(std::string scriptString, uint256 &hash) {
 	scriptString = dehexString;
 	
 	// Step 2: Convert the Dehexed Token to sense
-	std::vector<std::string> strs, ptrs; 
-	SeperateString(dehexString, strs, false);
-	scriptString = strs.at(0);
+	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
+	
+	if(1 >= (int)strs.size())
+		return false;
+	
+	// Step 3: Convert the token to our variables
+	std::string lr = ptrs.at(0);
+	std::string ls = ptrs.at(1); ScrubString(ls, true);
+	
+	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
+	if (timeStamp > stringToInteger(ls) + 5 * 60)
+		return false;
 	
 	// Step 3: Get hash
-	hash = uint256S(scriptString);
+	hash = uint256S(lr);
 	
 	return true;
-}
-
-/** Checks whether as to parties have actually signed it - please use this with ones **without** the OP_CODE */
-bool Fluid::CheckNonScriptQuorum(std::string token, std::string &message, bool individual) {
-	std::string result = "12345 " + token;
-	return CheckIfQuorumExists(result, message, individual);
 }
 
 /** Checks whether as to parties have actually signed it - please use this with ones with the OP_CODE */
@@ -409,41 +408,26 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	// Step 2: Convert the Dehexed Token to sense
 	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
 	
+	if(2 >= (int)strs.size())
+		return false;
+	
 	// Step 3: Convert the token to our variables
 	std::string lr = ptrs.at(0); ScrubString(lr, true); 
-	std::string ls = ptrs.at(2); ScrubString(ls, true);
+	std::string ls = ptrs.at(1); ScrubString(ls, true);
+	
+	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
+	if (nTime > stringToInteger(ls) + 5 * 60)
+		return false;
 	
 	coinAmount			 	= stringToInteger(lr);
 
-	std::string recipientAddress = ptrs.at(4);
+	std::string recipientAddress = ptrs.at(2);
 	destination.SetString(recipientAddress);
 		
 	if(!destination.IsValid())
 		return false;
 	
 	return true;
-}
-
-bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
-	CBlock block; 
-	if(!getBlockFromHeader(blockHeader, block))
-		throw std::runtime_error("Cannot access blockchain database!");
-	
-    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
-		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
-			if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX)) {
-				std::string message;
-				if (!CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-					LogPrintf("Fluid::GetMintingInstructions: FAILED instruction verification!\n");
-				else {
-					if (!ParseMintKey(GetTime(), toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
-						LogPrintf("Fluid::GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
-					} else return true;
-				} 
-			} else { LogPrintf("Fluid::GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
-		}
-	}
-	return false;
 }
 
 bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed) {
@@ -467,6 +451,28 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	return true;
 }
 
+bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount) {
+	CBlock block; 
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX)) {
+				std::string message;
+				if (!CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
+					LogPrintf("Fluid::GetMintingInstructions: FAILED instruction verification!\n");
+				else {
+					if (!ParseMintKey(block.nTime, toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
+						LogPrintf("Fluid::GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
+					} else return true;
+				} 
+			} else { LogPrintf("Fluid::GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
+		}
+	}
+	return false;
+}
+
 void Fluid::GetDestructionTxes(const CBlockHeader& blockHeader, CValidationState& state, CAmount &amountDestroyed) {
 	CBlock block; 
 	CAmount parseToDestroy = 0; amountDestroyed = 0;
@@ -484,41 +490,6 @@ void Fluid::GetDestructionTxes(const CBlockHeader& blockHeader, CValidationState
 	}
 }
 
-UniValue burndynamic(const UniValue& params, bool fHelp)
-{
- 	CWalletTx wtx;
-
-    if (!EnsureWalletIsAvailable(fHelp))
-        return NullUniValue;
-    
-    if (fHelp || params.size() != 1)
-        throw std::runtime_error(
-            "burndynamic \"amount\"\n"
-            "\nSend coins to be burnt (destroyed) onto the Dynamic Network\n"
-            "\nArguments:\n"
-            "1. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("burndynamic", "123.456")
-            + HelpExampleRpc("burndynamic", "123.456")
-        );
-
-    EnsureWalletIsUnlocked();   
-	
-	CAmount nAmount = AmountFromValue(params[0]);
-	
-	if (nAmount <= 0)
-		throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for destruction");
-	
-	std::string result = std::to_string(nAmount);
-    fluid.ConvertToHex(result);
-    
-    CScript destroyScript = CScript() << OP_DESTROY << ParseHex(result);
-    
-    SendCustomTransaction(destroyScript, wtx, nAmount);
-
-    return wtx.GetHash().GetHex();
-}
-
 bool Fluid::GetProofOverrideRequest(const CBlockHeader& blockHeader, CValidationState& state, CAmount &howMuch) {
 	CBlock block; 
 	if(!getBlockFromHeader(blockHeader, block))
@@ -529,7 +500,7 @@ bool Fluid::GetProofOverrideRequest(const CBlockHeader& blockHeader, CValidation
 			if (txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)) {
 				std::string message;
 				if (CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-					return GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), howMuch);
+					return GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), block.nTime, howMuch);
 			}
 		}
 	}
@@ -546,7 +517,7 @@ bool Fluid::GetDynodeOverrideRequest(const CBlockHeader& blockHeader, CValidatio
 			if (txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)) {
 				std::string message;
 				if (CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-					return GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), howMuch);
+					return GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), block.nTime, howMuch);
 			}
 		}
 	}
@@ -638,6 +609,41 @@ CAmount getDynodeSubsidyWithOverride(CAmount lastOverrideCommand, bool fDynode) 
 	} else {
 		return GetDynodePayment(fDynode);
 	}
+}
+
+UniValue burndynamic(const UniValue& params, bool fHelp)
+{
+ 	CWalletTx wtx;
+
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+    
+    if (fHelp || params.size() != 1)
+        throw std::runtime_error(
+            "burndynamic \"amount\"\n"
+            "\nSend coins to be burnt (destroyed) onto the Dynamic Network\n"
+            "\nArguments:\n"
+            "1. \"account\"         (numeric or string, required) The amount of coins to be minted.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("burndynamic", "123.456")
+            + HelpExampleRpc("burndynamic", "123.456")
+        );
+
+    EnsureWalletIsUnlocked();   
+	
+	CAmount nAmount = AmountFromValue(params[0]);
+	
+	if (nAmount <= 0)
+		throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for destruction");
+	
+	std::string result = std::to_string(nAmount);
+    fluid.ConvertToHex(result);
+    
+    CScript destroyScript = CScript() << OP_DESTROY << ParseHex(result);
+    
+    SendCustomTransaction(destroyScript, wtx, nAmount);
+
+    return wtx.GetHash().GetHex();
 }
 
 UniValue sendfluidtransaction(const UniValue& params, bool fHelp)
@@ -782,10 +788,10 @@ UniValue consenttoken(const UniValue& params, bool fHelp)
 
 	if (!fluid.GenericConsentMessage(params[1].get_str(), result, address))
 		throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Message signing failed");
-    
-    if (!fluid.CheckNonScriptQuorum(result, message, false))
+	
+	if (!fluid.CheckNonScriptQuorum(result, message, false))
 		throw std::runtime_error("Quorum Signature cannot be from the same address twice");
-
+	
 	return result;
 }
 
@@ -839,16 +845,17 @@ bool CheckIfAddressIsBlacklisted(CScript scriptPubKey) {
 	return false;
 }
 
-bool ProcessBanEntry(std::string getBanInstruction, std::vector<uint256>& bannedList) {
+bool ProcessBanEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList) {
 	uint256 entry;
 	std::string one = fluid.fluidImportantAddress(KEY_UNE), two = fluid.fluidImportantAddress(KEY_DEUX), three = fluid.fluidImportantAddress(KEY_TROIS);
 	/* Can we get hash to insert? */
-	if (!fluid.GenericParseHash(getBanInstruction, entry))
+	if (!fluid.GenericParseHash(getBanInstruction, timestamp, entry))
 		return false;
 	
-	/* Is it already there? */
+	
 	BOOST_FOREACH(const uint256& offendingHash, bannedList)
 	{
+		/* Is it already there? */
 		if (offendingHash == entry) {
 			return false;
 			/* You can't jsut ban the hodl addresses */
@@ -866,11 +873,11 @@ bool ProcessBanEntry(std::string getBanInstruction, std::vector<uint256>& banned
 	return true;
 }
 
-bool RemoveEntry(std::string getBanInstruction, std::vector<uint256>& bannedList) {
+bool RemoveEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList) {
 	uint256 entry;
 	
 	/* Can we get hash to insert? */
-	if (!fluid.GenericParseHash(getBanInstruction, entry))
+	if (!fluid.GenericParseHash(getBanInstruction, timestamp, entry))
 		return false;
 	
 	/* Is it already there? */
@@ -885,4 +892,30 @@ bool RemoveEntry(std::string getBanInstruction, std::vector<uint256>& bannedList
 	}
 	
 	return false;
+}
+
+void AddRemoveBanAddresses(const CBlockHeader& blockHeader, std::vector<uint256> &bannedList) {
+	/* Step One: Get the bloukz! */
+	CBlock block; 
+	std::string message;
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+	/* Step Two: Process transactions */
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			/* First those who add addresses */
+			if (txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX)) {
+				if (CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
+					if (!ProcessBanEntry(ScriptToAsmStr(txout.scriptPubKey), block.nTime, bannedList)
+						LogPrintf("Script Public Key for Ban: %s , FAILED!\n", ScriptToAsmStr(txout.scriptPubKey))
+			}
+			/* Second those who remove addresses */
+			if (txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)) {
+				if (CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
+					if (!RemoveEntry(ScriptToAsmStr(txout.scriptPubKey), block.nTime, bannedList)
+						LogPrintf("Script Public Key for Unban: %s , FAILED!\n", ScriptToAsmStr(txout.scriptPubKey))
+			}
+		}
+	}
 }

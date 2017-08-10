@@ -26,14 +26,14 @@
 
 #include <boost/algorithm/string.hpp>
 
-ProtocolToken PrimaryDelimiter = "~";
-ProtocolToken SubDelimiter = "%";
+ProtocolToken PrimaryDelimiter = "@";
+ProtocolToken SubDelimiter = "$";
 ProtocolToken SignatureDelimiter = " ";
 
 /* String Manipulation */
 void ScrubString(std::string &input, bool forInteger) {
-	input.erase(std::remove(input.begin(), input.end(), '~'), input.end());
-	input.erase(std::remove(input.begin(), input.end(), '%'), input.end());
+	input.erase(std::remove(input.begin(), input.end(), '@'), input.end());
+	input.erase(std::remove(input.begin(), input.end(), '$'), input.end());
 	if (forInteger)
 		input.erase(std::remove(input.begin(), input.end(), ' '), input.end());
 }
@@ -46,7 +46,7 @@ void SeperateString(std::string input, std::vector<std::string> &output, bool su
 };
 
 std::string StitchString(std::string stringOne, std::string stringTwo, bool subDelimiter) {
-	ScrubString(stringOne); ScrubString(stringTwo);
+//	ScrubString(stringOne); ScrubString(stringTwo);
 	
 	if(subDelimiter)
 		return stringOne + SubDelimiter + stringTwo;
@@ -55,17 +55,26 @@ std::string StitchString(std::string stringOne, std::string stringTwo, bool subD
 }
 
 std::string StitchString(std::string stringOne, std::string stringTwo, std::string stringThree, bool subDelimiter) {
-	ScrubString(stringOne); ScrubString(stringTwo);
+//	ScrubString(stringOne); ScrubString(stringTwo);
 	
 	if(subDelimiter)
 		return stringOne + SubDelimiter + stringTwo + SubDelimiter + stringThree;
 	else 
 		return stringOne + PrimaryDelimiter + stringTwo + PrimaryDelimiter + stringThree;
 }
+#include <stdint.h>
+
+#include <iostream>
+#include <sstream>
 
 int64_t stringToInteger(std::string input) {
+	int64_t result;
+	
 	ScrubString(input, true);
-	return stoi(input);
+	std::stringstream stream(input);
+	stream >> result;
+	
+	return result;
 }
 
 std::string getRidOfScriptStatement(std::string input) {

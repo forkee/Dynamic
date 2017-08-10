@@ -1048,8 +1048,11 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
     if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
-    // Check for negative or overflow output values
-    CAmount nValueOut = 0, nCoinsBurn = 0;
+    // Check for negative or overflow output values (and other stuff)
+    CDynamicAddress toMintAddress;
+    std::string message; uint256 entry;
+    CAmount nValueOut = 0, nCoinsBurn = 0, mintAmount;
+    
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
         if (txout.nValue < 0)
@@ -1060,26 +1063,40 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
 		
+		if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && 
+			!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
+				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-parse-failure");
+		
+		/* Block of Fluid Verification */
 		if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) 
 			|| txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX)
 			|| txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)
 			|| txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX)
 			|| txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)
+			|| txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX)
 			) {
-			std::string message;
-			if (!fluid.CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
-		}
+				if (!fluid.CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message)) {
+					return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
+				}
+				
+				if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) &&
+					!fluid.ParseMintKey(chainActive.Tip()->nTime, toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
+						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
+				} else if ((txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX) ||
+							txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)) &&
+							!fluid.GenericParseHash(ScriptToAsmStr(txout.scriptPubKey), chainActive.Tip()->nTime, entry)) {
+						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-hash-auth-failure");
+							}
+				  else if (!fluid.GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), chainActive.Tip()->nTime, mintAmount) {
+						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-general-parse-failure");
+				} else { /* ... */ }
+			}
 
-		if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX)) {
-			if (!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-auth-failure");
-		}
-		
+		/* Check if address is part of ban list */
 		if (CheckIfAddressIsBlacklisted(txout.scriptPubKey))
 			return state.DoS(100, false, REJECT_INVALID, "bad-txns-output-banned-address");
-    }
-
+	}
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
@@ -3110,6 +3127,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 	} else {
 	 		pindex->overridenDynodeReward = newDynodeReward;
 	}
+	
+	// Handle the ban address system and update the vector
+	AddRemoveBanAddresses(pindex->pprev->GetBlockHeader(), pindex->bannedAddresses);
 	
     // END DYNAMIC
 

@@ -214,8 +214,9 @@ enum opcodetype
 	OP_REWARD_DYNODE = 0xc3,
 	OP_REWARD_MINING = 0xc4,
 	OP_STERILIZE = 0xc5,
-	OP_FLUID_DEACTIVATE = 0xc6,
-	OP_FLUID_REACTIVATE = 0xc7,
+	OP_REALLOW = 0xc6,
+	OP_FLUID_DEACTIVATE = 0xc7,
+	OP_FLUID_REACTIVATE = 0xc8,
 	
     // template matching params
     OP_SMALLINTEGER = 0xfa,
@@ -703,6 +704,12 @@ public:
 				break;
 			case DEACTIVATE_TX:
 				return (size() > 0 && *begin() == OP_FLUID_DEACTIVATE);
+				break;
+			case STERILIZE_TX:
+				return (size() > 0 && *begin() == OP_STERILIZE);
+				break;
+			case REALLOW_TX:
+				return (size() > 0 && *begin() == OP_REALLOW);
 				break;
 			default:
 				throw std::runtime_error("Protocol code is of literally nothing!");
