@@ -1049,9 +1049,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
     // Check for negative or overflow output values (and other stuff)
-    CDynamicAddress toMintAddress;
-    std::string message; uint256 entry;
-    CAmount nValueOut = 0, nCoinsBurn = 0, mintAmount;
+    CAmount nValueOut = 0;
     
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
@@ -1062,40 +1060,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
-		
-		if (txout.scriptPubKey.IsProtocolInstruction(DESTROY_TX) && 
-			!fluid.ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, nCoinsBurn))
-				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-burn-parse-failure");
-		
-		/* Block of Fluid Verification */
-		if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) 
-			|| txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX)
-			|| txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)
-			|| txout.scriptPubKey.IsProtocolInstruction(ACTIVATE_TX)
-			|| txout.scriptPubKey.IsProtocolInstruction(DEACTIVATE_TX)
-			|| txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)
-			|| txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX)
-			) {
-				if (!fluid.CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message)) {
-					return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
-				}
-				
-				if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) &&
-					!fluid.ParseMintKey(chainActive.Tip()->nTime, toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
-						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
-				} else if ((txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX) ||
-							txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)) &&
-							!fluid.GenericParseHash(ScriptToAsmStr(txout.scriptPubKey), chainActive.Tip()->nTime, entry)) {
-						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-hash-auth-failure");
-							}
-				  else if (!fluid.GenericParseNumber(ScriptToAsmStr(txout.scriptPubKey), chainActive.Tip()->nTime, mintAmount) {
-						return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-general-parse-failure");
-				} else { /* ... */ }
-			}
 
-		/* Check if address is part of ban list */
-		if (CheckIfAddressIsBlacklisted(txout.scriptPubKey))
-			return state.DoS(100, false, REJECT_INVALID, "bad-txns-output-banned-address");
+		if (!fluid.ValidationProcesses(state, txout.scriptPubKey, txout.nValue))
+			return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-validate-failure");
 	}
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
@@ -3083,19 +3050,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         fDynodePaid = false;
     }
     
-	CDynamicAddress addressX;
-	CValidationState validationState;
-	CAmount nExpectedBlockValue, fluidIssuance, dynamicBurnt;
+	CAmount nExpectedBlockValue;
 	std::string strError = "";
 	
-	if (fluid.GetMintingInstructions(pindex->pprev->GetBlockHeader(), validationState, addressX, fluidIssuance)) {
-	    nExpectedBlockValue = 	getDynodeSubsidyWithOverride(pindex->pprev->overridenDynodeReward, fDynodePaid) + 
-								getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward) + 
-								fluidIssuance;
-	} else {
-		nExpectedBlockValue = 	getDynodeSubsidyWithOverride(pindex->pprev->overridenDynodeReward, fDynodePaid) + 
-								getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward);
-	}
+	BuildFluidInformationIndex(pindex, nExpectedBlockValue, nFees, nValueIn, nValueOut, fDynodePaid);
 	
 	if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)) {
 		return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
@@ -3107,30 +3065,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                 REJECT_INVALID, "bad-cb-payee");
     }
     
-    // Get Destruction Transactions on the Network
-    fluid.GetDestructionTxes(pindex->pprev->GetBlockHeader(), validationState, dynamicBurnt);
-   	
-   	pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + (nValueOut - nValueIn) - dynamicBurnt;
-   	pindex->nDynamicBurnt = (pindex->pprev? pindex->pprev->nDynamicBurnt : 0) + dynamicBurnt;
-
-
-	// Get override reward transactions from the network
-	CAmount newReward = 0, newDynodeReward = 0;
-	if (!fluid.GetProofOverrideRequest(pindex->pprev->GetBlockHeader(), validationState, newReward)) {
-			pindex->overridenBlockReward = (pindex->pprev? pindex->pprev->overridenBlockReward : 0);
-	} else {
-			pindex->overridenBlockReward = newReward;
-	}
-	 
-	if (!fluid.GetDynodeOverrideRequest(pindex->pprev->GetBlockHeader(), validationState, newDynodeReward)) {
-	 		pindex->overridenDynodeReward = (pindex->pprev? pindex->pprev->overridenDynodeReward : 0);
-	} else {
-	 		pindex->overridenDynodeReward = newDynodeReward;
-	}
-	
-	// Handle the ban address system and update the vector
-	AddRemoveBanAddresses(pindex->pprev->GetBlockHeader(), pindex->bannedAddresses);
-	
     // END DYNAMIC
 
     if (!control.Wait())

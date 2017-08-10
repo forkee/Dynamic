@@ -26,9 +26,47 @@
 
 #include <boost/algorithm/string.hpp>
 
+/**
+ * Statements: 
+ *  OP_MINT HexOf(123$456$789@SignatureX@SignatureY)
+ * Tree
+ *  |---------|
+ *  | OP_MINT |
+ *  |_________|
+ *       |
+ *       |
+ *  |----------------|       |-------------|     |-------------|
+ *  | Command   One  | ----- | Digest One  |-----| Digest Two  |
+ *  | _______________|       |_____________|     |_____________|
+ *       |
+ *       |
+ *	------------------------
+ *  |          |           |
+ * 123        456         789
+ * 
+ **/
+ 
+ProtocolToken SignatureDelimiter = " ";
 ProtocolToken PrimaryDelimiter = "@";
 ProtocolToken SubDelimiter = "$";
-ProtocolToken SignatureDelimiter = " ";
+
+/**
+ * Fluid Protocol Commands, usage of only OP_FLUID OPCODE with Sub-Opcodes
+ **/
+static const int FLUID_OPERATION_MINT_COINS 				= 0xff01;
+static const int FLUID_OPERATION_DESTROY_COINS 				= 0xff02; // ONLY COMMAND AVAILABLE FOR ALL USERS
+static const int FLUID_OPERATION_CHANGE_REWARD_DYNODE 		= 0xff03;
+static const int FLUID_OPERATION_CHANGE_REWARD_MINING 		= 0xff04;
+static const int FLUID_OPERATION_STERILIZE_ADDRESS 			= 0xff05;
+static const int FLUID_OPERATION_REALLOW_ADDRESS 			= 0xff06;
+static const int FLUID_OPERATION_REACTIVATE 				= 0xff07;
+static const int FLUID_OPERATION_DEACTIVATE 				= 0xff08;
+static const int FLUID_OPERATION_DROPLET 					= 0xff09;
+static const int FLUID_OPERATION_RESERVED_ONE				= 0xff10;
+static const int FLUID_OPERATION_RESERVED_TWO				= 0xff11;
+static const int FLUID_OPERATION_RESERVED_THREE				= 0xff12;
+static const int FLUID_OPERATION_RESERVED_FOUR				= 0xff13;
+static const int FLUID_OPERATION_RESERVED_FIVE				= 0xff14;
 
 /* String Manipulation */
 void ScrubString(std::string &input, bool forInteger) {

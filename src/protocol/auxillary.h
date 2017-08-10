@@ -148,6 +148,24 @@ public:
 	void ConvertToString(std::string &input) { std::string output = HexToString(input); input = output; }
 };
 
+class CParameters {
+private:
+	/*
+	 * The three keys controlling the multiple signature system
+	 */
+	std::string defaultFluidAddressX = "DEmrYUjVeLQnuvLnZjqzCex9azDRAtPzUa"; // importprivkey MnjEkYWghQhBqSQSixDGVPpzrtYWrg1s1BZVuvznK3SF7s5dRmzd
+	std::string defaultFluidAddressY = "DM1sv8zT529d7rYPtGX5kKM2MjD8YrHg5D"; // importprivkey Mn64HNSDehPY4KKP8bZCMvcweYS7wrNszNWGvPHamcyPhjoZABSp
+	std::string defaultFluidAddressZ = "DKPH9BdcrVyWwRsUVbPtaUQSwJWv2AMrph"; // importprivkey MpPYgqNRGf8qQqkuds6si6UEfpddfps1NJ1uTVbp7P3g3imJLwAC
+
+public: 
+	const char* fluidImportantAddress(KeyNumber adr) {
+		if (adr == KEY_UNE) { return (defaultFluidAddressX.c_str()); }
+		else if (adr == KEY_DEUX) { return (defaultFluidAddressY.c_str()); }
+		else if (adr == KEY_TROIS) { return (defaultFluidAddressZ.c_str()); }
+		else { return "Invalid Address Requested"; }
+	}
+};
+
 /* String Manipulation Functions */
 void ScrubString(std::string &input, bool forInteger = false);
 void SeperateString(std::string input, std::vector<std::string> &output, bool subDelimiter = false);
