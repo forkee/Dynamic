@@ -211,21 +211,21 @@ bool Fluid::GenericConsentMessage(std::string message, std::string &signedString
 }
 
 /** It gets a number from the ASM of an OP_CODE without signature verification */
-bool Fluid::GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch) {
+bool Fluid::GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch, bool txCheckPurpose) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	
 	// Step 1.1: Check if our key matches the required quorum
 	std::string message;
 	if (!CheckNonScriptQuorum(scriptString, message)) {
-		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
+		LogPrintf("GenericParseNumber: CheckNonScriptQuorum FAILED! Cannot continue!, identifier: %s\n", scriptString);
 		return false;
 	}
 	
 	// Step 1.2: Convert new Hex Data to dehexed amount
 	std::string dehexString = HexToString(scriptString);
 	scriptString = dehexString;
-	
+
 	// Step 2: Convert the Dehexed Token to sense
 	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
 	
@@ -237,7 +237,7 @@ bool Fluid::GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmo
 	std::string ls = ptrs.at(1); ScrubString(ls, true);
 	
 	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
-	if (timeStamp > stringToInteger(ls) + 5 * 60)
+	if (timeStamp > stringToInteger(ls) + maximumFluidDistortionTime && !txCheckPurpose)
 		return false;
 	
 	howMuch			 	= stringToInteger(lr);
@@ -245,14 +245,14 @@ bool Fluid::GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmo
 	return true;
 }
 
-bool Fluid::GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash) {
+bool Fluid::GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash, bool txCheckPurpose) {
 	// Step 1: Make sense out of ASM ScriptKey, split OPCODE from Hex
 	std::string r = getRidOfScriptStatement(scriptString); scriptString = r;
 	
 	// Step 1.1.1: Check if our key matches the required quorum
 	std::string message;
 	if (!CheckNonScriptQuorum(scriptString, message)) {
-		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
+		LogPrintf("GenericParseHash: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", scriptString);
 		return false;
 	}
 	
@@ -271,7 +271,7 @@ bool Fluid::GenericParseHash(std::string scriptString, int64_t timeStamp, uint25
 	std::string ls = ptrs.at(1); ScrubString(ls, true);
 	
 	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
-	if (timeStamp > stringToInteger(ls) + 5 * 60)
+	if (timeStamp > stringToInteger(ls) + maximumFluidDistortionTime && !txCheckPurpose)
 		return false;
 	
 	// Step 3: Get hash
@@ -347,7 +347,7 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
     std::vector<unsigned char> vchSig = DecodeBase64(digestSignature.c_str(), &fInvalid);
 
     if (fInvalid) {
-		LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Digest Signature Found Invalid, Signature: %s \n", digestSignature);
+		LogPrintf("GenericVerifyInstruction: Digest Signature Found Invalid, Signature: %s \n", digestSignature);
 		return false;
 	}
 	
@@ -358,28 +358,24 @@ bool Fluid::GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddre
     CPubKey pubkey;
     
     if (!pubkey.RecoverCompact(ss.GetHash(), vchSig)) {
-		LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Public Key Recovery Failed! Hash: %s\n", ss.GetHash().ToString());
+		LogPrintf("GenericVerifyInstruction: Public Key Recovery Failed! Hash: %s\n", ss.GetHash().ToString());
 		return false;
 	}
     
-    if (!(CDynamicAddress(pubkey.GetID()) == addr)) {
-		LogPrintf("Fluid::GenericVerifyInstruction: Instruction Verification, Address Data Comparison Failed! Address 1: %s vs Address 2: %s \n", 
-				  CDynamicAddress(pubkey.GetID()).ToString(), addr.ToString());
-				  
+    if (!(CDynamicAddress(pubkey.GetID()) == addr))
 		return false;
-	}
 	
 	return true;
 }
 
-bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier) {
+bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier, bool txCheckPurpose) {
 	// Step 1: Make sense out of ASM ScriptKey, split OP_MINT from Hex
 	std::string r = getRidOfScriptStatement(uniqueIdentifier); uniqueIdentifier = r;
 	
 	// Step 1.1.1: Check if our key matches the required quorum
 	std::string message;
 	if (!CheckNonScriptQuorum(uniqueIdentifier, message)) {
-		LogPrintf("Fluid::ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
+		LogPrintf("ParseMintKey: GenericVerifyInstruction FAILED! Cannot continue!, identifier: %s\n", uniqueIdentifier);
 		return false;
 	}
 		
@@ -390,7 +386,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	// Step 2: Convert the Dehexed Token to sense
 	std::vector<std::string> strs, ptrs; SeperateString(dehexString, strs, false); SeperateString(strs.at(0), ptrs, true);
 	
-	if(2 >= (int)strs.size())
+	if(1 >= (int)strs.size() || 2 >= (int)ptrs.size())
 		return false;
 	
 	// Step 3: Convert the token to our variables
@@ -398,7 +394,7 @@ bool Fluid::ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &c
 	std::string ls = ptrs.at(1); ScrubString(ls, true);
 	
 	// Step 4: Final steps of parsing, is the timestamp exceeding five minutes?
-	if (nTime > stringToInteger(ls) + 5 * 60)
+	if (nTime > stringToInteger(ls) + maximumFluidDistortionTime && !txCheckPurpose)
 		return false;
 	
 	coinAmount			 	= stringToInteger(lr);
@@ -426,7 +422,7 @@ bool Fluid::ParseDestructionAmount(std::string scriptString, CAmount coinsSpent,
 	coinsDestroyed			= stringToInteger(lr);
 
 	if (coinsDestroyed != coinsSpent) {
-		LogPrintf("Fluid::ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy! Amount is %s claimed destroyed vs %s actually spent\n", std::to_string(coinsDestroyed), std::to_string(coinsSpent));
+		LogPrintf("ParseDestructionAmount: Coins claimed to be destroyed do not match coins spent to destroy! Amount is %s claimed destroyed vs %s actually spent\n", std::to_string(coinsDestroyed), std::to_string(coinsSpent));
 		return false;
 	}
 	
@@ -443,13 +439,13 @@ bool Fluid::GetMintingInstructions(const CBlockHeader& blockHeader, CValidationS
 			if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX)) {
 				std::string message;
 				if (!CheckIfQuorumExists(ScriptToAsmStr(txout.scriptPubKey), message))
-					LogPrintf("Fluid::GetMintingInstructions: FAILED instruction verification!\n");
+					LogPrintf("GetMintingInstructions: FAILED instruction verification!\n");
 				else {
 					if (!ParseMintKey(block.nTime, toMintAddress, mintAmount, ScriptToAsmStr(txout.scriptPubKey))) {
-						LogPrintf("Fluid::GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
+						LogPrintf("GetMintingInstructions: Failed in parsing key as, Address: %s, Amount: %s, Script: %s\n", toMintAddress.ToString(), mintAmount, ScriptToAsmStr(txout.scriptPubKey));
 					} else return true;
 				} 
-			} else { LogPrintf("Fluid::GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
+			} else { LogPrintf("GetMintingInstructions: No minting instruction, Script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
 	}
 	return false;
@@ -467,7 +463,7 @@ void Fluid::GetDestructionTxes(const CBlockHeader& blockHeader, CValidationState
 				if (ParseDestructionAmount(ScriptToAsmStr(txout.scriptPubKey), txout.nValue, parseToDestroy)) {
 					amountDestroyed += txout.nValue; // This is what metric we need to get
 				}
-			} else { LogPrintf("Fluid::GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
+			} else { LogPrintf("GetDestructionTxes: No destruction scripts, script: %s\n", ScriptToAsmStr(txout.scriptPubKey)); }
 		}
 	}
 }
@@ -567,7 +563,7 @@ CAmount getDynodeSubsidyWithOverride(CAmount lastOverrideCommand, bool fDynode) 
 bool Fluid::CheckIfAddressIsBlacklisted(CScript scriptPubKey) {
 	/* Step 1: Copy vector */
 	std::vector<uint256> bannedDatabase;
-	if (chainActive.Height() <= 10)
+	if (chainActive.Height() <= minimumThresholdForBanning)
 		return false;
 	else bannedDatabase = chainActive.Tip()->bannedAddresses;
 	
@@ -598,8 +594,7 @@ bool Fluid::ProcessBanEntry(std::string getBanInstruction, int64_t timestamp, st
 	/* Can we get hash to insert? */
 	if (!GenericParseHash(getBanInstruction, timestamp, entry))
 		return false;
-	
-	
+		
 	BOOST_FOREACH(const uint256& offendingHash, bannedList)
 	{
 		/* Is it already there? */
@@ -684,30 +679,42 @@ bool Fluid::ValidationProcesses(CValidationState &state, CScript txOut, CAmount 
 	if (txOut.IsProtocolInstruction(MINT_TX) 
 		|| txOut.IsProtocolInstruction(DYNODE_MODFIY_TX)
 		|| txOut.IsProtocolInstruction(MINING_MODIFY_TX)
-		|| txOut.IsProtocolInstruction(ACTIVATE_TX)
-		|| txOut.IsProtocolInstruction(DEACTIVATE_TX)
+		// || txOut.IsProtocolInstruction(ACTIVATE_TX)
+		// || txOut.IsProtocolInstruction(DEACTIVATE_TX)
 		|| txOut.IsProtocolInstruction(REALLOW_TX)
 		|| txOut.IsProtocolInstruction(STERILIZE_TX)
 		) {
 			if (!CheckIfQuorumExists(ScriptToAsmStr(txOut), message)) {
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-auth-failure");
-			}		
+			}
+					
 			if (txOut.IsProtocolInstruction(MINT_TX) &&
-				!ParseMintKey(chainActive.Tip()->nTime, toMintAddress, mintAmount, ScriptToAsmStr(txOut))) {
+				!ParseMintKey(0, toMintAddress, mintAmount, ScriptToAsmStr(txOut), true)) {
 				return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-mint-auth-failure");
-			} else if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
-						txOut.IsProtocolInstruction(REALLOW_TX)) &&
-						!GenericParseHash(ScriptToAsmStr(txOut), chainActive.Tip()->nTime, entry)) {
+			} 
+			
+			if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
+			     txOut.IsProtocolInstruction(REALLOW_TX)) &&
+				 !GenericParseHash(ScriptToAsmStr(txOut), 0, entry, true)) {
 					return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-hash-auth-failure");
 			}
-			  else if (!GenericParseNumber(ScriptToAsmStr(txOut), chainActive.Tip()->nTime, mintAmount)) {
-					return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-general-parse-failure");
+			
+			if ((txOut.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
+				 txOut.IsProtocolInstruction(MINING_MODIFY_TX)) &&
+				 !GenericParseNumber(ScriptToAsmStr(txOut), 0, mintAmount, true)) {
+					return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-modify-parse-failure");
+			}
+			
+			if (CheckTransactionInRecord(txOut)) {
+					return state.DoS(500, false, REJECT_INVALID, "bad-txns-fluid-exists-already");
 			}
 	}
 	
 	/* Check if address is part of ban list */
 	if (CheckIfAddressIsBlacklisted(txOut))
 		return state.DoS(100, false, REJECT_INVALID, "bad-txns-output-banned-address");
+	
+	return true;
 }
 
 void BuildFluidInformationIndex(CBlockIndex* pindex, CAmount &nExpectedBlockValue, CAmount nFees, CAmount nValueIn, 
@@ -715,7 +722,7 @@ void BuildFluidInformationIndex(CBlockIndex* pindex, CAmount &nExpectedBlockValu
 	CAmount fluidIssuance, dynamicBurnt, newReward = 0, newDynodeReward = 0;
 	CValidationState validationState;
 	CDynamicAddress addressX;
-	
+
 	if (fluid.GetMintingInstructions(pindex->pprev->GetBlockHeader(), validationState, addressX, fluidIssuance)) {
 	    nExpectedBlockValue = 	getDynodeSubsidyWithOverride(pindex->pprev->overridenDynodeReward, fDynodePaid) + 
 								getBlockSubsidyWithOverride(pindex->pprev->nHeight, nFees, pindex->pprev->overridenBlockReward) + 
@@ -746,4 +753,90 @@ void BuildFluidInformationIndex(CBlockIndex* pindex, CAmount &nExpectedBlockValu
 	
 	// Handle the ban address system and update the vector
 	fluid.AddRemoveBanAddresses(pindex->pprev->GetBlockHeader(), pindex->bannedAddresses);
+	
+	// Scan and add Fluid Transactions to the Database
+	fluid.AddFluidTransactionsToRecord(pindex->pprev->GetBlockHeader(), pindex->existingFluidTransactions);
+}
+
+void Fluid::AddFluidTransactionsToRecord(const CBlockHeader& blockHeader, std::vector<std::string> &transactionRecord) {
+	/* Step One: Get the bloukz! */
+	CBlock block; 
+	std::string message;
+	if(!getBlockFromHeader(blockHeader, block))
+		throw std::runtime_error("Cannot access blockchain database!");
+	
+	/* Step Two: Process transactions */
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+		BOOST_FOREACH(const CTxOut& txout, tx.vout) {
+			if (txout.scriptPubKey.IsProtocolInstruction(MINT_TX) 
+				|| txout.scriptPubKey.IsProtocolInstruction(DYNODE_MODFIY_TX)
+				|| txout.scriptPubKey.IsProtocolInstruction(MINING_MODIFY_TX)
+				|| txout.scriptPubKey.IsProtocolInstruction(REALLOW_TX)
+				|| txout.scriptPubKey.IsProtocolInstruction(STERILIZE_TX)
+				) {
+				if (!InsertTransactionToRecord(txout.scriptPubKey, transactionRecord)) {
+					LogPrintf("Script Public Key Database Entry: %s , FAILED!\n", ScriptToAsmStr(txout.scriptPubKey));
+				}
+			}
+		}
+	}
+}
+
+/* Insertion of transaction script to record */
+bool Fluid::InsertTransactionToRecord(CScript fluidInstruction, std::vector<std::string> &transactionRecord) {
+	std::string verificationString;
+
+	if (fluidInstruction.IsProtocolInstruction(MINT_TX) 
+		|| fluidInstruction.IsProtocolInstruction(DYNODE_MODFIY_TX)
+		|| fluidInstruction.IsProtocolInstruction(MINING_MODIFY_TX)
+		|| fluidInstruction.IsProtocolInstruction(REALLOW_TX)
+		|| fluidInstruction.IsProtocolInstruction(STERILIZE_TX)
+		) {
+			verificationString = ScriptToAsmStr(fluidInstruction);
+			
+			std::string message;
+			if (CheckIfQuorumExists(verificationString, message)) {
+				BOOST_FOREACH(const std::string& existingRecord, transactionRecord)
+				{
+					if (existingRecord == verificationString) {
+						return false;
+					}
+				}
+				
+				transactionRecord.push_back(verificationString);
+				return true;
+			}
+	}
+	
+	return false;
+}
+
+/* Check if transaction exists in record */
+bool Fluid::CheckTransactionInRecord(CScript fluidInstruction) {
+	std::string verificationString;
+	std::vector<std::string> transactionRecord;
+	if (chainActive.Height() <= minimumThresholdForBanning)
+		return false;
+	else transactionRecord = chainActive.Tip()->existingFluidTransactions;
+	
+	if (fluidInstruction.IsProtocolInstruction(MINT_TX) 
+		|| fluidInstruction.IsProtocolInstruction(DYNODE_MODFIY_TX)
+		|| fluidInstruction.IsProtocolInstruction(MINING_MODIFY_TX)
+		|| fluidInstruction.IsProtocolInstruction(REALLOW_TX)
+		|| fluidInstruction.IsProtocolInstruction(STERILIZE_TX)
+		) {
+			verificationString = ScriptToAsmStr(fluidInstruction);
+			
+			std::string message;
+			if (CheckIfQuorumExists(verificationString, message)) {
+				BOOST_FOREACH(const std::string& existingRecord, transactionRecord)
+				{
+					if (existingRecord == verificationString) {
+						return true;
+					}
+				}
+			}
+	}
+	
+	return false;
 }

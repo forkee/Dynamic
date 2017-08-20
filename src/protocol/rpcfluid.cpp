@@ -44,14 +44,15 @@ extern bool EnsureWalletIsAvailable(bool avoidException);
 extern void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CAmount nValue = (1*COIN));
 
 opcodetype getOpcodeFromString(std::string input) {
-    if ("OP_MINT") return OP_MINT;
-	else if ("OP_DESTROY") return OP_DESTROY;
-	else if ("OP_DROPLET") return OP_DROPLET;
-	else if ("OP_REWARD_DYNODE") return OP_REWARD_DYNODE;
-	else if ("OP_REWARD_MINING") return OP_REWARD_MINING;
-	else if ("OP_STERILIZE") return OP_STERILIZE;
-	else if ("OP_FLUID_DEACTIVATE") return OP_FLUID_DEACTIVATE;
-	else if ("OP_FLUID_REACTIVATE") return OP_FLUID_REACTIVATE;
+    if (input == "OP_MINT") return OP_MINT;
+	else if (input == "OP_DESTROY") return OP_DESTROY;
+	else if (input == "OP_DROPLET") return OP_DROPLET;
+	else if (input == "OP_REWARD_DYNODE") return OP_REWARD_DYNODE;
+	else if (input == "OP_REWARD_MINING") return OP_REWARD_MINING;
+	else if (input == "OP_STERILIZE") return OP_STERILIZE;
+	else if (input == "OP_FLUID_DEACTIVATE") return OP_FLUID_DEACTIVATE;
+	else if (input == "OP_FLUID_REACTIVATE") return OP_FLUID_REACTIVATE;
+	else return OP_RETURN;
 	
 	return OP_RETURN;
 };
@@ -142,6 +143,8 @@ UniValue burndynamic(const UniValue& params, bool fHelp)
     return wtx.GetHash().GetHex();
 }
 
+opcodetype negatif = OP_RETURN;
+
 UniValue sendfluidtransaction(const UniValue& params, bool fHelp)
 {
 	CScript finalScript;
@@ -162,9 +165,7 @@ UniValue sendfluidtransaction(const UniValue& params, bool fHelp)
         );
 
     EnsureWalletIsUnlocked();
-      
     opcodetype opcode = getOpcodeFromString(params[0].get_str());
-    opcodetype negatif = OP_RETURN;
     
 	if (negatif == opcode)
 		throw std::runtime_error("OP_CODE is either not a Fluid OP_CODE or is invalid");

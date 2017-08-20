@@ -407,9 +407,10 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                 pindexNew->nTx            = diskindex.nTx;
                 pindexNew->nMoneySupply   = diskindex.nMoneySupply;
                 pindexNew->nDynamicBurnt  = diskindex.nDynamicBurnt;
-                pindexNew->overridenBlockReward   	= diskindex.overridenBlockReward;
-                pindexNew->overridenDynodeReward   	= diskindex.overridenDynodeReward;
-                pindexNew->bannedAddresses = diskindex.bannedAddresses;
+                pindexNew->overridenBlockReward   		= diskindex.overridenBlockReward;
+                pindexNew->overridenDynodeReward   		= diskindex.overridenDynodeReward;
+                pindexNew->bannedAddresses 				= diskindex.bannedAddresses;
+                pindexNew->existingFluidTransactions 	= diskindex.existingFluidTransactions;
                 
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                     return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());

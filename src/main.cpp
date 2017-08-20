@@ -1215,6 +1215,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
     if (!CheckTransaction(tx, state))
         return false;
 
+
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
         return state.DoS(100, false, REJECT_INVALID, "coinbase");
@@ -1693,11 +1694,38 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 {
     std::vector<uint256> vHashTxToUncache;
     bool res = AcceptToMemoryPoolWorker(pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vHashTxToUncache, fDryRun);
-    if (!res || fDryRun) {
+    bool fluidTimestampCheck = true;
+    
+	BOOST_FOREACH(const CTxOut& txout, tx.vout)	{
+		CScript txOut = txout.scriptPubKey;
+		CDynamicAddress stubAddress;
+		int64_t stubVariable;
+		uint256 stubHash;
+		
+		if (txOut.IsProtocolInstruction(MINT_TX) &&
+			!fluid.ParseMintKey(GetTime(), stubAddress, stubVariable, ScriptToAsmStr(txOut))) {
+				fluidTimestampCheck = false;
+		} 
+
+		if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
+			txOut.IsProtocolInstruction(REALLOW_TX)) &&
+			!fluid.GenericParseHash(ScriptToAsmStr(txOut), GetTime(), stubHash)) {
+				fluidTimestampCheck = false;
+		}
+			
+		if ((txOut.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
+			 txOut.IsProtocolInstruction(MINING_MODIFY_TX)) &&
+			 !fluid.GenericParseNumber(ScriptToAsmStr(txOut), GetTime(), stubVariable)) {
+				fluidTimestampCheck = false;
+		}
+	}
+    
+    if (!res || fDryRun || !fluidTimestampCheck) {
         if(!res) LogPrint("mempool", "%s: %s %s\n", __func__, tx.GetHash().ToString(), state.GetRejectReason());
         BOOST_FOREACH(const uint256& hashTx, vHashTxToUncache)
             pcoinsTip->Uncache(hashTx);
     }
+    
     return res;
 }
 
@@ -4127,11 +4155,43 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // END DYNAMIC
 
     // Check transactions
-    BOOST_FOREACH(const CTransaction& tx, block.vtx)
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
         if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s",
                 tx.GetHash().ToString(),
                 FormatStateMessage(state));
+
+			BOOST_FOREACH(const CTxOut& txout, tx.vout)
+			{
+				CScript txOut = txout.scriptPubKey;
+				CDynamicAddress stubAddress;
+				int64_t stubVariable;
+				uint256 stubHash;
+				
+				if (txOut.IsProtocolInstruction(MINT_TX) &&
+					!fluid.ParseMintKey(block.nTime, stubAddress, stubVariable, ScriptToAsmStr(txOut))) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				} 
+						
+				if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
+					txOut.IsProtocolInstruction(REALLOW_TX)) &&
+					!fluid.GenericParseHash(ScriptToAsmStr(txOut), block.nTime, stubHash)) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				}
+						
+				if ((txOut.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
+					 txOut.IsProtocolInstruction(MINING_MODIFY_TX)) &&
+					 !fluid.GenericParseNumber(ScriptToAsmStr(txOut), block.nTime, stubVariable)) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				}
+			}
+	}
                 
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)

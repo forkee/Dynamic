@@ -47,6 +47,10 @@ static const CAmount PHASE_1_POW_REWARD = COIN * 1.5;
 static const CAmount PHASE_1_DYNODE_PAYMENT = COIN * 0.382;
 static const CAmount PHASE_2_DYNODE_PAYMENT = COIN * 0.618;
 
+/** Maximum Fluid Transaction Request Validity Time */
+static const int64_t maximumFluidDistortionTime = 5 * 60;
+static const int minimumThresholdForBanning = 10;
+
 class Fluid : public CParameters, public HexFunctions {
 private:
 	enum OverrideType {
@@ -70,11 +74,11 @@ public:
 	bool SignIntimateMessage(CDynamicAddress address, std::string unsignedMessage, std::string &stitchedMessage, bool stitch = true);
 	
 	bool GenericSignMessage(std::string message, std::string &signedString, CDynamicAddress signer);
-	bool GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch);
-	bool GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash);
+	bool GenericParseNumber(std::string scriptString, int64_t timeStamp, CAmount &howMuch, bool txCheckPurpose=false);
+	bool GenericParseHash(std::string scriptString, int64_t timeStamp, uint256 &hash, bool txCheckPurpose=false);
 	bool GenericVerifyInstruction(std::string uniqueIdentifier, CDynamicAddress signer, std::string &messageTokenKey, int whereToLook=1);
 	
-	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier);
+	bool ParseMintKey(int64_t nTime, CDynamicAddress &destination, CAmount &coinAmount, std::string uniqueIdentifier, bool txCheckPurpose=false);
 	bool ParseDestructionAmount(std::string scriptString, CAmount coinsSpent, CAmount &coinsDestroyed);
 
 	bool GetMintingInstructions(const CBlockHeader& blockHeader, CValidationState& state, CDynamicAddress &toMintAddress, CAmount &mintAmount);
@@ -87,6 +91,10 @@ public:
 	bool CheckIfAddressIsBlacklisted(CScript scriptPubKey);
 	bool ProcessBanEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList);
 	bool RemoveEntry(std::string getBanInstruction, int64_t timestamp, std::vector<uint256> &bannedList);
+	
+	bool InsertTransactionToRecord(CScript fluidInstruction, std::vector<std::string> &transactionRecord);
+	bool CheckTransactionInRecord(CScript fluidInstruction);
+	void AddFluidTransactionsToRecord(const CBlockHeader& blockHeader, std::vector<std::string> &transactionRecord);
 	
 	bool ValidationProcesses(CValidationState& state, CScript txOut, CAmount txValue);
 };
