@@ -17,7 +17,7 @@
 #include "chainparamsbase.h"
 #include "core_io.h"
 #include "dbwrapper.h"
-#include "dns/dns.h"
+// #include "dns/dns.h"
 #include "key.h"
 #include "main.h"
 #include "policy/policy.h"
@@ -77,7 +77,7 @@ MultisigDialog::~MultisigDialog()
     delete ui;
 }
 
-
+/*
 bool MultisigDialog::AdvertisePublicKeyForMultiSig(const std::string& address, const std::string& publickey)
 {
     std::string strQuestion = "<p>Do you want to announce the public key for your " + address + " address?</p><p>You will be charged the minimun transaction fee.</p>";
@@ -91,7 +91,7 @@ bool MultisigDialog::AdvertisePublicKeyForMultiSig(const std::string& address, c
     if(msgBox.exec() == QMessageBox::Yes)
     {
         std::string strAddress = ""; 
-        CNameVal name = nameValFromString("address:" + address);
+        //CNameVal name = nameValFromString("address:" + address);
         CNameVal value = nameValFromString(publickey);
         std::string strValue = stringFromNameVal(value);
         int nRentalDays = 35;
@@ -126,7 +126,7 @@ CPubKey MultisigDialog::SearchForPubKeyByAddress(const std::string& address)
     }
     return emptyPubKey;
 }
-
+*/
 
 void MultisigDialog::setModel(WalletModel *model)
 {
@@ -276,7 +276,7 @@ void MultisigDialog::on_createAddressButton_clicked()
                 
                 CPubKey vchPubKey;
                 if ((fError == false) && (!pwalletMain->GetPubKey(keyID, vchPubKey)))
-                    vchPubKey = SearchForPubKeyByAddress(strAddressEntered);
+                    fError = true; //SearchForPubKeyByAddress(strAddressEntered);
 
                 if ((fError == false) && !vchPubKey.IsFullyValid())
                     fError = true;
@@ -301,7 +301,7 @@ void MultisigDialog::on_createAddressButton_clicked()
         CDynamicAddress multiSigAddress(scriptID);
         ui->multisigAddress->setText(multiSigAddress.ToString().c_str());
         ui->redeemScript->setText(HexStr(script.begin(), script.end()).c_str());
-    }
+    } /*
     else
     {
         for(std::map<std::string,std::string>::iterator iter = myAddressList.begin(); iter != myAddressList.end(); ++iter)
@@ -309,7 +309,7 @@ void MultisigDialog::on_createAddressButton_clicked()
             // TODO (Amir): If user agrees to advertise their public key using DDNS as a multisig name (fee = 0.001 SLK)
             AdvertisePublicKeyForMultiSig(iter->first, iter->second);
         }
-    }
+    }*/
 }
 
 void MultisigDialog::on_copyMultisigAddressButton_clicked()

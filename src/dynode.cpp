@@ -14,6 +14,7 @@
 #include "messagesigner.h"
 #include "util.h"
 #include "consensus/validation.h"
+#include "protocol/fluid.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -383,7 +384,7 @@ void CDynode::UpdateLastPaid(const CBlockIndex *pindex, int nMaxBlocksToScanBack
             if(!ReadBlockFromDisk(block, BlockReading, Params().GetConsensus())) // shouldn't really happen
                 continue;
 
-            CAmount nDynodePayment = GetDynodePayment();
+            CAmount nDynodePayment = getDynodeSubsidyWithOverride(BlockReading->overridenDynodeReward);
 
             BOOST_FOREACH(CTxOut txout, block.vtx[0].vout)
                 if(dnpayee == txout.scriptPubKey && nDynodePayment == txout.nValue) {

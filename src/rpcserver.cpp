@@ -404,19 +404,69 @@ static const CRPCCommand vRPCCommands[] =
     { "Wallet",             "walletlock",             &walletlock,             true  },
     { "Wallet",             "walletpassphrasechange", &walletpassphrasechange, true  },
     { "Wallet",             "walletpassphrase",       &walletpassphrase,       true  },
-     /* Decentralised DNS */
-    { "DDNS",               "name_scan",              &name_scan,              true  },
-    { "DDNS",               "name_filter",            &name_filter,            true  },
-    { "DDNS",               "name_show",              &name_show,              true  },
-    { "DDNS",               "name_history",           &name_history,           true  },
-    { "DDNS",               "name_mempool",           &name_mempool,           true  },
-    { "DDNS",               "name_new",               &name_new,               true  },
-    { "DDNS",               "name_update",            &name_update,            true  },
-    { "DDNS",               "name_delete",            &name_delete,            true  },
-    { "DDNS",               "name_list",              &name_list,              true  },
+
+    /* Fluid Protocol */
+    { "Protocol",           "sendfluidtransaction",	  &sendfluidtransaction,   true  },
+    { "Protocol",           "signtoken",			  &signtoken,			   true  },
+    { "Protocol",           "consenttoken",			  &consenttoken,		   true  },
+    { "Protocol",           "burndynamic",			  &burndynamic,			   true  },
+    { "Protocol",           "getmoneysupply",		  &getmoneysupply,		   true  },
+    { "Protocol",           "ntptime",		  		  &ntptime,		   		   true  },
+    { "Protocol",           "getrawpubkey",	 		  &getrawpubkey,		   true  },
+    { "Protocol",           "verifyquorum",	 		  &verifyquorum,		   true  },
+    { "Protocol",           "stringtohex",	 		  &stringtohex,		   true  },
+
+    /* Syscoin-ported DynamicX Protocol */
+    { "Identity",           "identitynew",		  	  &identitynew,		  	  	true  },
+    { "Identity",           "identityupdate",		  &identityupdate,		  	true  },
+    { "Identity",           "identitylist",		  	  &identitylist,		  	true  },
+    { "Identity",           "identityaffiliates",	  &identityaffiliates,	  	true  },
+    { "Identity",           "identityinfo",		  	  &identityinfo,		  	true  },
+    { "Identity",           "identityhistory",		  &identityhistory,		  	true  },
+    { "Identity",           "identityfilter",		  &identityfilter,		  	true  },
+    { "Identity",           "identitypay",		  	  &identitypay,		   	 	true  },
+    { "Identity",           "generatepublickey",	  &generatepublickey,		true  },
+    
+    { "Offer",           "offernew",		  	  	&offernew,		  	  	true  },
+    { "Offer",           "offerupdate",		  		&offerupdate,		  	true  },
+    { "Offer",           "offeraccept",		  	  	&offeraccept,		  	true  },
+    { "Offer",           "offerlink",	  			&offerlink,	  			true  },
+    { "Offer",           "offeraddwhitelist",		&offeraddwhitelist,		true  },
+    { "Offer",           "offerremovewhitelist",	&offerremovewhitelist,	true  },
+    { "Offer",           "offerclearwhitelist",		&offerclearwhitelist,	true  },
+    { "Offer",           "offerwhitelist",		  	&offerwhitelist,		true  },
+    { "Offer",           "offerinfo",	  			&offerinfo,				true  },
+    { "Offer",           "offerlist",	  			&offerlist,				true  },
+    { "Offer",           "offeracceptlist",	  		&offeracceptlist,		true  },
+    { "Offer",           "offerhistory",	  		&offerhistory,			true  },
+    { "Offer",           "offerfilter",	  			&offerfilter,			true  },
+
+    { "Certificate",           "certupdate",		&certupdate,		 	true  },
+    { "Certificate",           "certnew",		  	&certnew,		  		true  },
+    { "Certificate",           "certtransfer",		&certtransfer,		  	true  },
+    { "Certificate",           "certinfo",	  		&certinfo,	  			true  },
+    { "Certificate",           "certlist",		  	&certlist,		  		true  },
+    { "Certificate",           "certhistory",		&certhistory,		  	true  },
+    { "Certificate",           "certfilter",		&certfilter,		  	true  },
+
+    { "Escrow",           "escrownew",		  	  	&escrownew,		  	  	true  },
+    { "Escrow",           "escrowrelease",		  	&escrowrelease,		  	true  },
+    // { "Escrow",           "escrowcomplete",		  	&escrowcomplete,		true  },
+    { "Escrow",           "escrowclaimrelease",	  	&escrowclaimrelease,	true  },
+    { "Escrow",           "escrowrefund",		  	&escrowrefund,		  	true  },
+    { "Escrow",           "escrowclaimrefund",		&escrowclaimrefund,		true  },
+    { "Escrow",           "escrowinfo",		  		&escrowinfo,		  	true  },
+    { "Escrow",           "escrowlist",		  	  	&escrowlist,		   	true  },
+    { "Escrow",           "escrowhistory",	  		&escrowhistory,			true  },
+	{ "Escrow",           "escrowfilter",	  		&escrowfilter,			true  },
+
+    { "Messaging",        "messagenew",		  	  	&messagenew,		  	true  },
+    { "Messaging",        "messageinfo",		  	&messageinfo,		  	true  },
+    // { "Messaging",        "messagelist",		  	&messagelist,		  	true  },
+    { "Messaging",        "messagesentlist",	  	&messagesentlist,	  	true  },
+    // { "Messaging",        "messagehistory",		  	&messagehistory,		true  },
+
 #endif // ENABLE_WALLET
-    /* Not shown in help */
-    { "Hidden", "name_debug", &name_debug, false },
 };
 
 CRPCTable::CRPCTable()

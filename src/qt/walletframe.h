@@ -69,7 +69,7 @@ public Q_SLOTS:
     /** Switch to send coins page */
     void gotoSendCoinsPage(QString addr = "");
     /** Switch to DNS page */
-    void gotoDNSPage();
+//    void gotoDNSPage();
     /** Switch to MultiSig page */
 	  void gotoMultiSigPage();
 

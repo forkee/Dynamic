@@ -14,7 +14,6 @@
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/consensus.h"
-#include "dns/dns.h"
 #include "dynode-payments.h"
 #include "dynode-sync.h"
 #include "dynodeman.h"
@@ -47,6 +46,15 @@
 #include "validationinterface.h"
 #include "versionbits.h"
 #include "checkforks.h"
+#include "protocol/fluid.h"
+#include "protocol/duality.h"
+
+#include "protocol/identity.h"
+#include "protocol/offer.h"
+#include "protocol/escrow.h"
+#include "protocol/message.h"
+#include "protocol/cert.h"
+#include "protocol/offer.h"
 
 #include <atomic>
 #include <sstream>
@@ -124,8 +132,6 @@ void EraseOrphansFor(NodeId peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
  */
 static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams);
 static void CheckBlockIndex(const Consensus::Params& consensusParams);
-
-CHooks* hooks = InitHook(); //this adds ddns hooks which allow splicing of code inside standard dynamic functions.
 
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
@@ -1031,7 +1037,6 @@ int GetISConfirmations(const uint256 &nTXHash)
     return 0;
 }
 
-
 bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
@@ -1043,8 +1048,9 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
     if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
-    // Check for negative or overflow output values
+    // Check for negative or overflow output values (and other stuff)
     CAmount nValueOut = 0;
+    
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
         if (txout.nValue < 0)
@@ -1054,8 +1060,10 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
-    }
 
+		if (!fluid.ValidationProcesses(state, txout.scriptPubKey, txout.nValue))
+			return state.DoS(100, false, REJECT_INVALID, "bad-txns-fluid-validate-failure");
+	}
     // Check for duplicate inputs
     std::set<COutPoint> vInOutPoints;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
@@ -1130,6 +1138,72 @@ static CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool 
     return nMinFee;
 }
 
+using namespace std; // Ugh...
+
+bool CheckDynamicInputs(const CTransaction& tx, const CCoinsViewCache& inputs, bool fJustCheck, int nHeight=0)
+{
+	vector<vector<unsigned char> > vvchArgs;
+	int op;
+	int nOut;	
+	if(nHeight == 0)
+		nHeight = chainActive.Height();
+	string errorMessage;
+	if(tx.nVersion == GetDynamicTxVersion())
+	{
+		bool good = true;
+		for(unsigned int j = 0;j<tx.vout.size();j++)
+		{
+			if(!good)
+				break;
+			if(DecodeIdentityScript(tx.vout[j].scriptPubKey, op, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckIdentityInputs(tx, op, j, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+		}
+		if(good)
+		{
+			if(DecodeCertTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckCertInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeEscrowTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckEscrowInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);		
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeMessageTx(tx, op, nOut, vvchArgs))
+			{
+				errorMessage.clear();
+				good = CheckMessageInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+			else if(DecodeOfferTx(tx, op, nOut, vvchArgs))
+			{	
+				errorMessage.clear();
+				good = CheckOfferInputs(tx, op, nOut, vvchArgs, inputs, fJustCheck, nHeight, errorMessage);	 
+				if(fDebug && !errorMessage.empty())
+					LogPrintf("%s\n", errorMessage.c_str());
+			}
+		}
+		if(!good)
+		{
+			return false;
+		}
+		
+	}
+	return true;	
+	
+}
+
 bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                               bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee,
                               std::vector<uint256>& vHashTxnToUncache, bool fDryRun)
@@ -1140,6 +1214,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
 
     if (!CheckTransaction(tx, state))
         return false;
+
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
@@ -1330,7 +1405,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         // Added for DDNS
         // Don't accept it if it can't get into a block
         CAmount txMinFee = GetMinRelayFee(tx, nSize, true);
-        if ((fLimitFree && nFees < txMinFee) || (isNameTx && !hooks->IsNameFeeEnough(tx, nFees)))
+        if (fLimitFree && nFees < txMinFee)
             return state.DoS(0, error("AcceptToMemoryPool : not enough fees %s, %d < %d",
                                       hash.ToString(), nFees, txMinFee),
                              REJECT_INSUFFICIENTFEE, "insufficient fee");
@@ -1572,6 +1647,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             return error("%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), FormatStateMessage(state));
         }
+		
+		// DYNAMIC
+        if (!CheckDynamicInputs(tx, view, true))
+			return false;
 
         // Remove conflicting transactions from the mempool
         BOOST_FOREACH(const CTxMemPool::txiter it, allConflicting)
@@ -1615,24 +1694,53 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 {
     std::vector<uint256> vHashTxToUncache;
     bool res = AcceptToMemoryPoolWorker(pool, state, tx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit, fRejectAbsurdFee, vHashTxToUncache, fDryRun);
-    if (!res || fDryRun) {
+    bool fluidTimestampCheck = true;
+    
+	BOOST_FOREACH(const CTxOut& txout, tx.vout)	{
+		CScript txOut = txout.scriptPubKey;
+		CDynamicAddress stubAddress;
+		int64_t stubVariable;
+		uint256 stubHash;
+		
+		if (txOut.IsProtocolInstruction(MINT_TX) &&
+			!fluid.ParseMintKey(GetTime(), stubAddress, stubVariable, ScriptToAsmStr(txOut))) {
+				fluidTimestampCheck = false;
+		} 
+
+		if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
+			txOut.IsProtocolInstruction(REALLOW_TX)) &&
+			!fluid.GenericParseHash(ScriptToAsmStr(txOut), GetTime(), stubHash)) {
+				fluidTimestampCheck = false;
+		}
+			
+		if ((txOut.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
+			 txOut.IsProtocolInstruction(MINING_MODIFY_TX)) &&
+			 !fluid.GenericParseNumber(ScriptToAsmStr(txOut), GetTime(), stubVariable)) {
+				fluidTimestampCheck = false;
+		}
+	}
+    
+    if (!res || fDryRun || !fluidTimestampCheck) {
         if(!res) LogPrint("mempool", "%s: %s %s\n", __func__, tx.GetHash().ToString(), state.GetRejectReason());
         BOOST_FOREACH(const uint256& hashTx, vHashTxToUncache)
             pcoinsTip->Uncache(hashTx);
     }
+    
     return res;
 }
 
-bool GetTimestampIndex(const unsigned int &high, const unsigned int &low, std::vector<uint256> &hashes)
+
+bool GetTimestampIndex(const unsigned int &high, const unsigned int &low, const bool fActiveOnly, std::vector<std::pair<uint256, unsigned int> > &hashes)
 {
     if (!fTimestampIndex)
         return error("Timestamp index not enabled");
 
-    if (!pblocktree->ReadTimestampIndex(high, low, hashes))
+    if (!pblocktree->ReadTimestampIndex(high, low, fActiveOnly, hashes))
         return error("Unable to get hashes for timestamps");
 
     return true;
 }
+
 
 bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 {
@@ -1644,6 +1752,17 @@ bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 
     if (!pblocktree->ReadSpentIndex(key, value))
         return false;
+
+    return true;
+}
+
+bool HashOnchainActive(const uint256 &hash)
+{
+    CBlockIndex* pblockindex = mapBlockIndex[hash];
+
+    if (!chainActive.Contains(pblockindex)) {
+        return false;
+    }
 
     return true;
 }
@@ -1801,43 +1920,6 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
 {
     return ReadBlockFromDisk(block, pindex, Params().GetConsensus());
-}
-
-CAmount GetPoWBlockPayment(const int& nHeight, CAmount nFees)
-{
-    if (chainActive.Height() == 0) {
-        CAmount nSubsidy = 4000000 * COIN;
-        LogPrint("superblock creation", "GetPoWBlockPayment() : create=%s nSubsidy=%d\n", FormatMoney(nSubsidy), nSubsidy);
-        return nSubsidy;
-    }
-    else if (chainActive.Height() >= 1 && chainActive.Height() <= Params().GetConsensus().nRewardsStart) {
-        LogPrint("zero-reward block creation", "GetPoWBlockPayment() : create=%s nSubsidy=%d\n", FormatMoney(BLOCKCHAIN_INIT_REWARD), BLOCKCHAIN_INIT_REWARD);
-        return BLOCKCHAIN_INIT_REWARD + nFees;
-    }
-    else if (chainActive.Height() > Params().GetConsensus().nRewardsStart) {
-        LogPrint("creation", "GetPoWBlockPayment() : create=%s PoW Reward=%d\n", FormatMoney(PHASE_1_POW_REWARD), PHASE_1_POW_REWARD);
-        return PHASE_1_POW_REWARD + nFees; // 1 DYN
-    }
-    else 
-        return BLOCKCHAIN_INIT_REWARD + nFees;
-}
-
-CAmount GetDynodePayment(bool fDynode)
-{   
-    if (fDynode && chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && chainActive.Height() < Params().GetConsensus().nUpdateDiffAlgoHeight) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(PHASE_1_DYNODE_PAYMENT), PHASE_1_DYNODE_PAYMENT);
-        return PHASE_1_DYNODE_PAYMENT; // 0.382 DYN
-    }
-    else if (fDynode && chainActive.Height() > Params().GetConsensus().nDynodePaymentsStartBlock && chainActive.Height() >= Params().GetConsensus().nUpdateDiffAlgoHeight) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(PHASE_2_DYNODE_PAYMENT), PHASE_2_DYNODE_PAYMENT);
-        return PHASE_2_DYNODE_PAYMENT; // 0.618 DYN
-    }
-    else if ((fDynode && !fDynode) && chainActive.Height() <= Params().GetConsensus().nDynodePaymentsStartBlock) {
-        LogPrint("creation", "GetDynodePayment() : create=%s DN Payment=%d\n", FormatMoney(BLOCKCHAIN_INIT_REWARD), BLOCKCHAIN_INIT_REWARD);
-        return BLOCKCHAIN_INIT_REWARD;
-    }
-    else
-        return BLOCKCHAIN_INIT_REWARD;
 }
 
 bool IsInitialBlockDownload()
@@ -2267,6 +2349,163 @@ static bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const CO
     return fClean;
 }
 
+bool DisconnectIdentity(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = identityFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED IDENTITY TXN: identity=%s op=%s hash=%s  height=%d\n",
+		stringFromVch(vvchArgs[0]).c_str(),
+		identityFromOp(op).c_str(),
+		tx.GetHash().ToString().c_str(),
+		pindex->nHeight);
+
+	
+	vector<CIdentityIndex> vtxPos;
+	vector<CIdentityPayment> vtxPaymentPos;
+	if(!pidentitydb)
+		return false;
+	pidentitydb->ReadIdentityPayment(vvchArgs[0], vtxPaymentPos);
+	pidentitydb->ReadIdentity(vvchArgs[0], vtxPos);
+	if(vtxPos.empty())
+		return true;
+	const CIdentityIndex &foundIdentity = vtxPos.back();
+	while (!vtxPos.empty() && foundIdentity.txHash == tx.GetHash())	
+		vtxPos.pop_back();
+	while (!vtxPaymentPos.empty() && vtxPaymentPos.back().txHash == tx.GetHash())	
+		vtxPaymentPos.pop_back();	
+
+	if(!pidentitydb->WriteIdentity(vvchArgs[0], vtxPos))
+		return error("DisconnectBlock() : failed to write to identity DB");
+	if(!pidentitydb->WriteIdentityPayment(vvchArgs[0], vtxPaymentPos))
+		return error("DisconnectBlock() : failed to write payment to identity DB");
+
+
+	return true;
+}
+
+bool DisconnectOffer(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = offerFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED offer TXN: offer=%s op=%s hash=%s  height=%d\n",
+			stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);    
+	
+	
+	COffer theOffer(tx);
+	vector<COffer> vtxPos;
+	if (theOffer.IsNull())
+		return false;
+
+	if(!pofferdb)
+		return false;
+	pofferdb->ReadOffer(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+		
+
+    // write new offer state to db
+
+	if(!pofferdb->WriteOffer(vvchArgs[0], vtxPos))
+		return error("DisconnectOffer() : failed to write to offer DB");
+	
+
+	return true;
+}
+
+bool DisconnectCertificate(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = certFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED CERT TXN: cert=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+
+	// make sure a DB record exists for this cert
+	vector<CCert> vtxPos;
+
+	if(!pcertdb)
+		return false;
+	pcertdb->ReadCert(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+		
+
+
+	// write new offer state to db
+
+	if(!pcertdb->WriteCert(vvchArgs[0], vtxPos))
+		return error("DisconnectCertificate() : failed to write to offer DB");
+
+
+	return true;
+}
+
+bool DisconnectEscrow(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = escrowFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED ESCROW TXN: escrow=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+			opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+	// make sure a DB record exists for this escrow
+	vector<CEscrow> vtxPos;
+
+	if(!pescrowdb)
+		return false;
+	pescrowdb->ReadEscrow(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+
+	// write new escrow state to db
+
+	if(!pescrowdb->WriteEscrow(vvchArgs[0], vtxPos))
+		return error("DisconnectEscrow() : failed to write to escrow DB");
+	
+
+
+	return true;
+}
+
+bool DisconnectMessage(const CBlockIndex *pindex, const CTransaction &tx, int op, vector<vector<unsigned char> > &vvchArgs ) {
+	string opName = messageFromOp(op);
+	if(fDebug)
+		LogPrintf("DISCONNECTED MESSAGE TXN: message=%s op=%s hash=%s height=%d\n",
+		   stringFromVch(vvchArgs[0]).c_str(),
+		   	opName.c_str(),
+			tx.GetHash().ToString().c_str(),
+			pindex->nHeight);	
+	
+
+	// make sure a DB record exists for this msg
+	vector<CMessage> vtxPos;
+
+	if(!pmessagedb)
+		return false;
+	pmessagedb->ReadMessage(vvchArgs[0], vtxPos);  
+	if(vtxPos.empty())
+		return true;
+	while (!vtxPos.empty() && vtxPos.back().txHash == tx.GetHash())	
+		vtxPos.pop_back();
+	// write new message state to db
+
+	if(!pmessagedb->WriteMessage(vvchArgs[0], vtxPos))
+		return error("DisconnectMessage() : failed to write to message DB");
+	
+
+	return true;
+}
+
 bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockIndex* pindex, CCoinsViewCache& view, bool* pfClean, const bool fWriteNames)
 {
     assert(pindex->GetBlockHash() == view.GetBestBlock());
@@ -2390,16 +2629,9 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
                 }
 
             }
-
-            // Dynamic: undo name transactions in reverse order
-            if (fWriteNames)
-                for (int i = block.vtx.size() - 1; i >= 0; i--)
-                    hooks->DisconnectInputs(block.vtx[i]);
-
         }
     }
-
-
+    
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
 
@@ -2583,7 +2815,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     AssertLockHeld(cs_main);
 
     int64_t nTimeStart = GetTimeMicros();
-
+    
+    CAmount nValueIn = 0;
+    CAmount nValueOut = 0;
+    
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
         return false;
@@ -2769,12 +3004,18 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             }
 
             nFees += view.GetValueIn(tx)-tx.GetValueOut();
+			
+			nValueIn += view.GetValueIn(tx);
+            nValueOut += tx.GetValueOut();
 
             std::vector<CScriptCheck> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
             if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, nScriptCheckThreads ? &vChecks : NULL))
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                     tx.GetHash().ToString(), FormatStateMessage(state));
+			if (!CheckDynamicInputs(tx, view, fJustCheck, pindex->nHeight))
+				return error("ConnectBlock(): CheckDynamicInputs on %s failed",tx.GetHash().ToString());
+
             control.Add(vChecks);
         }
 
@@ -2815,7 +3056,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
-    }
+    }    
+        
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * 0.000001);
 
@@ -2835,19 +3077,22 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     else if (chainActive.Height() <= Params().GetConsensus().nDynodePaymentsStartBlock) {
         fDynodePaid = false;
     }
-
-    CAmount nExpectedBlockValue = GetDynodePayment(fDynodePaid) + GetPoWBlockPayment(pindex->pprev->nHeight, nFees);
-    std::string strError = "";
-
-    if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)){
-        return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
-    }
-
+    
+	CAmount nExpectedBlockValue;
+	std::string strError = "";
+	
+	BuildFluidInformationIndex(pindex, nExpectedBlockValue, nFees, nValueIn, nValueOut, fDynodePaid);
+	
+	if(!IsBlockValueValid(block, pindex->nHeight, nExpectedBlockValue, strError)) {
+		return state.DoS(0, error("ConnectBlock(DYN): %s", strError), REJECT_INVALID, "bad-cb-amount");
+	}
+	
     if (!IsBlockPayeeValid(block.vtx[0], pindex->nHeight, nExpectedBlockValue)) {
         mapRejectedBlocks.insert(std::make_pair(block.GetHash(), GetTime()));
         return state.DoS(0, error("ConnectBlock(DYN): couldn't find Dynode or Superblock payments"),
                                 REJECT_INVALID, "bad-cb-payee");
     }
+    
     // END DYNAMIC
 
     if (!control.Wait())
@@ -2862,14 +3107,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // Dynamic: collect valid name tx
     // NOTE: tx.UpdateCoins should not affect this loop, probably...
     std::vector<CAmount> vFees (block.vtx.size(), 0);
-    std::vector<nameTempProxy> vName;
-    if (fWriteNames)
-        for (unsigned int i=0; i<block.vtx.size(); i++)
-        {
-            const CTransaction &tx = block.vtx[i];
-            if (!tx.IsCoinBase())
-                hooks->CheckInputs(tx, pindex, vName, vPos[i].second, vFees[i]); // collect valid name tx to vName
-        }
 
     // Write undo information to disk
     if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -2908,9 +3145,26 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (!pblocktree->UpdateSpentIndex(spentIndex))
             return AbortNode(state, "Failed to write transaction index");
 
-    if (fTimestampIndex)
-        if (!pblocktree->WriteTimestampIndex(CTimestampIndexKey(pindex->nTime, pindex->GetBlockHash())))
+    if (fTimestampIndex) {
+        unsigned int logicalTS = pindex->nTime;
+        unsigned int prevLogicalTS = 0;
+
+        // retrieve logical timestamp of the previous block
+        if (pindex->pprev)
+            if (!pblocktree->ReadTimestampBlockIndex(pindex->pprev->GetBlockHash(), prevLogicalTS))
+                LogPrintf("%s: Failed to read previous block's logical timestamp\n", __func__);
+
+        if (logicalTS <= prevLogicalTS) {
+            logicalTS = prevLogicalTS + 1;
+            LogPrintf("%s: Previous logical timestamp is newer Actual[%d] prevLogical[%d] Logical[%d]\n", __func__, pindex->nTime, prevLogicalTS, logicalTS);
+        }
+
+        if (!pblocktree->WriteTimestampIndex(CTimestampIndexKey(logicalTS, pindex->GetBlockHash())))
             return AbortNode(state, "Failed to write timestamp index");
+
+        if (!pblocktree->WriteTimestampBlockIndex(CTimestampBlockIndexKey(pindex->GetBlockHash()), CTimestampBlockIndexValue(logicalTS)))
+            return AbortNode(state, "Failed to write blockhash index");
+    }
 
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
@@ -2934,10 +3188,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
-
-    // Dynamic DDNS: add names to ddns.dat
-    if (fWriteNames)
-        hooks->ConnectBlock(pindex, vName);
 
     return true;
 }
@@ -2964,7 +3214,8 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
     std::set<int> setFilesToPrune;
     bool fFlushForPrune = false;
     try {
-    if (fPruneMode && fCheckForPruning && !fReindex) {
+// Never prune, it will prevent us from verifying points
+/*    if (fPruneMode && fCheckForPruning && !fReindex) {
         FindFilesToPrune(setFilesToPrune, chainparams.PruneAfterHeight());
         fCheckForPruning = false;
         if (!setFilesToPrune.empty()) {
@@ -2975,7 +3226,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
             }
         }
     }
-    int64_t nNow = GetTimeMicros();
+  */  int64_t nNow = GetTimeMicros();
     // Avoid writing/flushing immediately after startup.
     if (nLastWrite == 0) {
         nLastWrite = nNow;
@@ -3165,10 +3416,34 @@ bool static DisconnectTip(CValidationState& state, const Consensus::Params& cons
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
-    // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    BOOST_FOREACH(const CTransaction &tx, block.vtx) {
+	BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         SyncWithWallets(tx, NULL);
+		// DYNAMIC disconnect
+		if (tx.nVersion == GetDynamicTxVersion()) {
+			vector<vector<unsigned char> > vvchArgs;
+			int op, nOut;
+			if(DecodeIdentityTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectIdentity(pindexDelete, tx, op, vvchArgs);	
+			}
+			if(DecodeOfferTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectOffer(pindexDelete, tx, op, vvchArgs); 
+			}
+			if(DecodeCertTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectCertificate(pindexDelete, tx, op, vvchArgs);				
+			}
+			if(DecodeEscrowTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectEscrow(pindexDelete, tx, op, vvchArgs);	
+			}
+			if(DecodeMessageTx(tx, op, nOut, vvchArgs))
+			{
+				DisconnectMessage(pindexDelete, tx, op, vvchArgs);	
+			}
+		}
     }
     return true;
 }
@@ -3787,7 +4062,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW)
 {
-    // Check proof of work matches claimed amount
+	// Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
                          REJECT_INVALID, "high-hash");
@@ -3880,17 +4155,49 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // END DYNAMIC
 
     // Check transactions
-    BOOST_FOREACH(const CTransaction& tx, block.vtx)
+    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
         if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s",
                 tx.GetHash().ToString(),
                 FormatStateMessage(state));
 
+			BOOST_FOREACH(const CTxOut& txout, tx.vout)
+			{
+				CScript txOut = txout.scriptPubKey;
+				CDynamicAddress stubAddress;
+				int64_t stubVariable;
+				uint256 stubHash;
+				
+				if (txOut.IsProtocolInstruction(MINT_TX) &&
+					!fluid.ParseMintKey(block.nTime, stubAddress, stubVariable, ScriptToAsmStr(txOut))) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				} 
+						
+				if ((txOut.IsProtocolInstruction(STERILIZE_TX) ||
+					txOut.IsProtocolInstruction(REALLOW_TX)) &&
+					!fluid.GenericParseHash(ScriptToAsmStr(txOut), block.nTime, stubHash)) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				}
+						
+				if ((txOut.IsProtocolInstruction(DYNODE_MODFIY_TX) ||
+					 txOut.IsProtocolInstruction(MINING_MODIFY_TX)) &&
+					 !fluid.GenericParseNumber(ScriptToAsmStr(txOut), block.nTime, stubVariable)) {
+						return error("CheckBlock(): Timestamp check for Fluid Transaction to Block %s failed with %s",
+					tx.GetHash().ToString(),
+					FormatStateMessage(state));
+				}
+			}
+	}
+                
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {
         nSigOps += GetLegacySigOpCount(tx);
-    }
+    }    
     if (nSigOps > MAX_BLOCK_SIGOPS)
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops");
@@ -3915,26 +4222,28 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex* pindexPrev, CValidati
     return true;
 }
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev, int64_t nAdjustedTime)
 { 
     int nHeight = (pindexPrev->nHeight + 1);
     uint256 hash = block.GetHash();
-    
+
     if (hash == Params().GetConsensus().hashGenesisBlock)
         return true;
-
-    const Consensus::Params& consensusParams = Params().GetConsensus();
-
-    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams)) {
-        if (block.nBits != LegacyRetargetBlock(pindexPrev, &block, consensusParams))
-            return state.DoS(100, error("%s : incorrect proof of work at %d", __func__, nHeight),
-                         REJECT_INVALID, "bad-diffbits");
-    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
         return state.Invalid(error("%s: block's timestamp is too early", __func__),
                              REJECT_INVALID, "time-too-old");
+	
+    // Check timestamp
+    if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME)
+        return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
+
+	// Check spaces between blocks
+	/* int64_t spaceBetweenBlocks = (block.GetBlockTime() - pindexPrev->nTime);
+	if (spaceBetweenBlocks > blockTolerance || spaceBetweenBlocks < blockTolerance) 
+		return state.Invalid(false, REJECT_INVALID, "time-spacing-error", "block timestamp between then and previous too little or too much");
+	*/
     return true;
 }
 
@@ -3959,7 +4268,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
             return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
     }
-
+    
     // Enforce block.nVersion=2 rule that the coinbase starts with serialized block height
     // if 750 of the last 1,000 blocks are version 2 or greater (51/100 if testnet):
     if (block.nVersion >= 2 && IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams))
@@ -4011,7 +4320,7 @@ static bool AcceptBlockHeader(const CBlockHeader& block, CValidationState& state
         if (fCheckpointsEnabled && !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams, hash))
             return error("%s: CheckIndexAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
-        if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+        if (!ContextualCheckBlockHeader(block, state, chainparams.GetConsensus(), pindexPrev, GetAdjustedTime()))
             return false;
     }
     if (pindex == NULL)
@@ -4149,7 +4458,7 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+    if (!ContextualCheckBlockHeader(block, state, chainparams.GetConsensus(), pindexPrev, GetAdjustedTime()))
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
@@ -4605,17 +4914,22 @@ bool InitBlockIndex(const CChainParams& chainparams)
     // Use the provided setting for -txindex in the new database
     fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     pblocktree->WriteFlag("txindex", fTxIndex);
+    LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
     // Use the provided setting for -addressindex in the new database
     fAddressIndex = GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX);
     pblocktree->WriteFlag("addressindex", fAddressIndex);
+    LogPrintf("%s: address index %s\n", __func__, fAddressIndex ? "enabled" : "disabled");
 
     // Use the provided setting for -timestampindex in the new database
     fTimestampIndex = GetBoolArg("-timestampindex", DEFAULT_TIMESTAMPINDEX);
     pblocktree->WriteFlag("timestampindex", fTimestampIndex);
+    LogPrintf("%s: timestamp index %s\n", __func__, fTimestampIndex ? "enabled" : "disabled");
 
+    // Use the provided setting for -spentindex in the new database
     fSpentIndex = GetBoolArg("-spentindex", DEFAULT_SPENTINDEX);
     pblocktree->WriteFlag("spentindex", fSpentIndex);
+    LogPrintf("%s: spent index %s\n", __func__, fSpentIndex ? "enabled" : "disabled");
 
     LogPrintf("Initializing databases...\n");
 

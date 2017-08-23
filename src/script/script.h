@@ -9,6 +9,7 @@
 #include "crypto/common.h"
 
 #include "prevector.h"
+#include "protocol/auxillary.h"
 
 #include <assert.h>
 #include <climits>
@@ -43,6 +44,37 @@ enum opcodetype
 {
     // push value
     OP_0 = 0x00,
+    
+    // identity alias system
+	OP_IDENTITY_NEW = 0xd1,
+	OP_IDENTITY_DELETE = 0xd2,
+    OP_IDENTITY_PAYMENT = 0xd3,
+    OP_IDENTITY_ACTIVATE=0xd4,
+    OP_IDENTITY_UPDATE=0xd5,
+	OP_IDENTITY_MULTISIG = 0xd6,
+
+    // distributed exchange
+    OP_OFFER_ACTIVATE=0x04,
+    OP_OFFER_UPDATE=0x05,
+    OP_OFFER_ACCEPT=0x06,
+	OP_OFFER_ACCEPT_FEEDBACK=0x07,
+
+    // distributed licensing system
+    OP_CERT_ACTIVATE=0x08,
+    OP_CERT_UPDATE=0x09,
+    OP_CERT_TRANSFER=0x0a,
+
+    // distributed escrow system
+    OP_ESCROW_ACTIVATE=0x0b,
+    OP_ESCROW_RELEASE=0x0c,
+    OP_ESCROW_REFUND=0x0d,
+	OP_ESCROW_COMPLETE=0x0e,
+
+	// encrypted messaging
+	OP_MESSAGE_ACTIVATE=0x0f,
+
+    // syscoin extended reserved 
+    OP_SYSCOIN_EXTENDED=0x10,
     OP_FALSE = OP_0,
     OP_PUSHDATA1 = 0x4c,
     OP_PUSHDATA2 = 0x4d,
@@ -175,7 +207,17 @@ enum opcodetype
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
-
+	// Fluid Autonomus Monetary Management System (FAM2S)
+    OP_MINT = 0xc0,
+	OP_DESTROY = 0xc1,
+	OP_DROPLET = 0xc2,
+	OP_REWARD_DYNODE = 0xc3,
+	OP_REWARD_MINING = 0xc4,
+	OP_STERILIZE = 0xc5,
+	OP_REALLOW = 0xc6,
+	OP_FLUID_DEACTIVATE = 0xc7,
+	OP_FLUID_REACTIVATE = 0xc8,
+	
     // template matching params
     OP_SMALLINTEGER = 0xfa,
     OP_PUBKEYS = 0xfb,
@@ -186,11 +228,6 @@ enum opcodetype
 };
 
 const char* GetOpName(opcodetype opcode);
-
-static const int OP_NAME_NEW = 0x01;
-static const int OP_NAME_UPDATE = 0x02;
-static const int OP_NAME_DELETE = 0x03;
-static const int OP_NAME_MULTISIG = 0x04;
 
 class scriptnum_error : public std::runtime_error
 {
@@ -637,9 +674,47 @@ public:
      * regardless of the initial stack. This allows outputs to be pruned
      * instantly when entering the UTXO set.
      */
+        
     bool IsUnspendable() const
     {
         return (size() > 0 && *begin() == OP_RETURN);
+    }
+
+	bool IsItDestroyTransaction() {
+		return (size() > 0 && *begin() == OP_DESTROY);
+	}
+
+	bool IsProtocolInstruction(ProtocolCodes code) const
+    {
+		switch(code) {
+			case MINT_TX:
+				return (size() > 0 && *begin() == OP_MINT);
+				break;
+			case DESTROY_TX:
+				return (size() > 0 && *begin() == OP_DESTROY);
+				break;
+			case DYNODE_MODFIY_TX:
+				return (size() > 0 && *begin() == OP_REWARD_DYNODE);
+				break;
+			case MINING_MODIFY_TX:
+				return (size() > 0 && *begin() == OP_REWARD_MINING);
+				break;
+			case ACTIVATE_TX:
+				return (size() > 0 && *begin() == OP_FLUID_REACTIVATE);
+				break;
+			case DEACTIVATE_TX:
+				return (size() > 0 && *begin() == OP_FLUID_DEACTIVATE);
+				break;
+			case STERILIZE_TX:
+				return (size() > 0 && *begin() == OP_STERILIZE);
+				break;
+			case REALLOW_TX:
+				return (size() > 0 && *begin() == OP_REALLOW);
+				break;
+			default:
+				throw std::runtime_error("Protocol code is of literally nothing!");
+		}
+		return false;
     }
 
     void clear()

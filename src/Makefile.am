@@ -20,12 +20,16 @@ LIBDYNAMIC_CRYPTO=crypto/libdynamic_crypto.a
 LIBDYNAMICQT=qt/libdynamicqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 LIBUNIVALUE=univalue/libunivalue.la
+LIBCRYPTOPP=cryptopp/libcryptopp.a
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
 $(LIBUNIVALUE): $(wildcard univalue/lib/*) $(wildcard univalue/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
+
+$(LIBCRYPTOPP):
+	@echo "Building CryptoPP Cryptographic Library..." && $(MAKE) -C $(@D) $(@F) CXX="$(CXX)" CC="$(CC)" OPT="$(AM_CXXFLAGS) $(PIE_FLAGS) $(CXXFLAGS) $(AM_CPPFLAGS) $(CPPFLAGS)"
 
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
 # But to build the less dependent modules first, we manually select their order here:
@@ -35,6 +39,7 @@ EXTRA_LIBRARIES += \
   libdynamic_common.a \
   libdynamic_server.a \
   libdynamic_cli.a
+  
 if ENABLE_WALLET
 DYNAMIC_INCLUDES += $(BDB_CPPFLAGS)
 EXTRA_LIBRARIES += libdynamic_wallet.a
@@ -59,12 +64,24 @@ if BUILD_DYNAMICD
 endif
 
 if BUILD_DYNAMIC_UTILS
-  bin_PROGRAMS += dynamic-cli dynamic-tx
+  bin_PROGRAMS += dynamic-cli
+#dynamic-tx
 endif
 
 .PHONY: FORCE check-symbols check-security
 # dynamic #
 DYNAMIC_CORE_H = \
+  protocol/ntp.h \
+  protocol/identity.h \
+  protocol/cert.h \
+  protocol/escrow.h \
+  protocol/feedback.h \
+  protocol/messagecrypter.h \
+  protocol/message.h \
+  protocol/offer.h \
+  protocol/fluid.h \
+  protocol/duality.h \
+  protocol/auxillary.h \
   activedynode.h \
   addressindex.h \
   spentindex.h \
@@ -100,9 +117,6 @@ DYNAMIC_CORE_H = \
   core_io.h \
   core_memusage.h \
   dbwrapper.h \
-  dns/dns.h \
-  dns/dyndns.h \
-  dns/hooks.h \
   dynode.h \
   dynode-payments.h \
   dynode-sync.h \
@@ -166,6 +180,7 @@ DYNAMIC_CORE_H = \
   support/allocators/zeroafterfree.h \
   support/cleanse.h \
   support/lockedpool.h \
+  support/pagelocker.h \
   sync.h \
   threadsafety.h \
   timedata.h \
@@ -203,6 +218,16 @@ libdynamic_util_a-clientversion.$(OBJEXT): obj/build.h
 libdynamic_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libdynamic_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_server_a_SOURCES = \
+  protocol/ntp.cpp \
+  protocol/identity.cpp \
+  protocol/cert.cpp \
+  protocol/escrow.cpp \
+  protocol/message.cpp \
+  protocol/messagecrypter.cpp \
+  protocol/offer.cpp \
+  protocol/fluid.cpp \
+  protocol/duality.cpp \
+  protocol/auxillary.cpp \
   addrman.cpp \
   alert.cpp \
   bloom.cpp \
@@ -210,8 +235,6 @@ libdynamic_server_a_SOURCES = \
   checkpoints.cpp \
   checkforks.cpp \
   dbwrapper.cpp \
-  dns/dns.cpp \
-  dns/dyndns.cpp \
   governance.cpp \
   governance-classes.cpp \
   governance-object.cpp \
@@ -239,6 +262,7 @@ libdynamic_server_a_SOURCES = \
   rpcnet.cpp \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
+  protocol/rpcfluid.cpp \
   script/sigcache.cpp \
   sendalert.cpp \
   timedata.cpp \
@@ -292,34 +316,96 @@ libdynamic_wallet_a_SOURCES = \
 crypto_libdynamic_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_CONFIG_INCLUDES) $(PIC_FLAGS)
 crypto_libdynamic_crypto_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS) $(PIC_FLAGS)
 crypto_libdynamic_crypto_a_SOURCES = \
-  crypto/common.h \
-  crypto/argon2d/argon2.h \
-  crypto/argon2d/core.h \
-  crypto/argon2d/encoding.h \
-  crypto/argon2d/thread.h \
-  crypto/argon2d/argon2.c \
-  crypto/argon2d/core.c \
-  crypto/argon2d/encoding.c \
-  crypto/argon2d/opt.c \
-  crypto/argon2d/thread.c \
-  crypto/blake2/blake2b.c \
-  crypto/blake2/blake2.h \
-  crypto/blake2/blake2-impl.h \
-  crypto/blake2/blamka-round-opt.h \
-  crypto/blake2/blamka-round-ref.h \
-  crypto/hmac_sha256.cpp \
-  crypto/hmac_sha256.h \
-  crypto/hmac_sha512.cpp \
-  crypto/hmac_sha512.h \
-  crypto/ripemd160.cpp \
-  crypto/ripemd160.h \
-  crypto/sha1.cpp \
-  crypto/sha1.h \
-  crypto/sha256.cpp \
-  crypto/sha256.h \
-  crypto/sha512.h \
-  crypto/sha512.cpp \
-  crypto/sha512.h
+	crypto/argon2d/argon2.c \
+	crypto/argon2d/argon2.h \
+	crypto/argon2d/core.c \
+	crypto/argon2d/core.h \
+	crypto/argon2d/encoding.c \
+	crypto/argon2d/encoding.h \
+	crypto/argon2d/opt.c \
+	crypto/argon2d/thread.c \
+	crypto/argon2d/thread.h \
+	crypto/blake2/blake2-impl.h \
+	crypto/blake2/blake2.h \
+	crypto/blake2/blake2b.c \
+	crypto/blake2/blamka-round-opt.h \
+	crypto/blake2/blamka-round-ref.h \
+	crypto/common.h \
+	crypto/chacha20.cpp \
+	crypto/chacha20.h \
+	crypto/hmac_sha256.cpp \
+	crypto/hmac_sha256.h \
+	crypto/hmac_sha512.cpp \
+	crypto/hmac_sha512.h \
+	crypto/muhash.cpp \
+	crypto/muhash.h \
+	crypto/ripemd160.cpp \
+	crypto/ripemd160.h \
+	crypto/sha1.cpp \
+	crypto/sha1.h \
+	crypto/sha256.cpp \
+	crypto/sha256.h \
+	crypto/sha512.cpp \
+	crypto/sha512.h \
+	protocol/libs/aes_helper.c \
+	protocol/libs/sha3nist.h \
+	protocol/libs/blake.c \
+	protocol/libs/sph_blake.h \
+	protocol/libs/bmw.c \
+	protocol/libs/sph_bmw.h \
+	protocol/libs/cubehash.c \
+	protocol/libs/sph_cubehash.h \
+	protocol/libs/echo.c \
+	protocol/libs/sph_echo.h \
+	protocol/libs/fugue.c \
+	protocol/libs/sph_fugue.h \
+	protocol/libs/groestl.c \
+	protocol/libs/sph_groestl.h \
+	protocol/libs/hamsi.c \
+	protocol/libs/sph_hamsi.h \
+	protocol/libs/haval.c \
+	protocol/libs/sph_haval.h \
+	protocol/libs/jh.c \
+	protocol/libs/sph_jh.h \
+	protocol/libs/keccak.c \
+	protocol/libs/sph_keccak.h \
+	protocol/libs/luffa.c \
+	protocol/libs/sph_luffa.h \
+	protocol/libs/md2.c \
+	protocol/libs/sph_md2.h \
+	protocol/libs/md4.c \
+	protocol/libs/sph_md4.h \
+	protocol/libs/md5.c \
+	protocol/libs/sph_md5.h \
+	protocol/libs/panama.c \
+	protocol/libs/sph_panama.h \
+	protocol/libs/radiogatun.c \
+	protocol/libs/sph_radiogatun.h \
+	protocol/libs/ripemd.c \
+	protocol/libs/sph_ripemd.h \
+	protocol/libs/sha0.c \
+	protocol/libs/sph_sha0.h \
+	protocol/libs/sha1.c \
+	protocol/libs/sph_sha1.h \
+	protocol/libs/sha2big.c \
+	protocol/libs/sha2.c \
+	protocol/libs/sph_sha2.h \
+	protocol/libs/sha3nist.c \
+	protocol/libs/sph_sha3.h \
+	protocol/libs/shabal.c \
+	protocol/libs/sph_shabal.h \
+	protocol/libs/shavite.c \
+	protocol/libs/sph_shavite.h \
+	protocol/libs/simd.c \
+	protocol/libs/sph_simd.h \
+	protocol/libs/speed.c \
+	protocol/libs/skein.c \
+	protocol/libs/sph_skein.h \
+	protocol/libs/tiger.c \
+	protocol/libs/sph_tiger.h \
+	protocol/libs/sph_types.h \
+	protocol/libs/whirlpool.c \
+	protocol/libs/sph_whirlpool.h
 
 # common: shared between dynamicd, and dynamic-qt and non-server tools
 libdynamic_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
@@ -359,6 +445,7 @@ libdynamic_common_a_SOURCES = \
 libdynamic_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
 libdynamic_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libdynamic_util_a_SOURCES = \
+  support/pagelocker.cpp \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \
@@ -408,7 +495,8 @@ dynamicd_LDADD = \
   $(LIBDYNAMIC_CRYPTO) \
   $(LIBLEVELDB) \
   $(LIBMEMENV) \
-  $(LIBSECP256K1)
+  $(LIBSECP256K1) \
+  $(LIBCRYPTOPP)
 
 if ENABLE_ZMQ
 dynamicd_LDADD += $(LIBDYNAMIC_ZMQ) $(ZMQ_LIBS)
@@ -437,24 +525,31 @@ dynamic_cli_LDADD = \
 dynamic_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
 
+#############################
+##
+## Commented out for protocol
+##
+#############################
+
 # dynamic-tx binary #
-dynamic_tx_SOURCES = dynamic-tx.cpp
-dynamic_tx_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
-dynamic_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-dynamic_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+#dynamic_tx_SOURCES = dynamic-tx.cpp
+#dynamic_tx_CPPFLAGS = $(AM_CPPFLAGS) $(DYNAMIC_INCLUDES)
+#dynamic_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+#dynamic_tx_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
-if TARGET_WINDOWS
-dynamic_tx_SOURCES += dynamic-tx-res.rc
-endif
+#if TARGET_WINDOWS
+#dynamic_tx_SOURCES += dynamic-tx-res.rc
+#endif
 
-dynamic_tx_LDADD = \
-  $(LIBUNIVALUE) \
-  $(LIBDYNAMIC_COMMON) \
-  $(LIBDYNAMIC_UTIL) \
-  $(LIBDYNAMIC_CRYPTO) \
-  $(LIBSECP256K1)
+#dynamic_tx_LDADD = \
+#  $(LIBUNIVALUE) \
+#  $(LIBDYNAMIC_COMMON) \
+#  $(LIBDYNAMIC_UTIL) \
+#  $(LIBDYNAMIC_CRYPTO) \
+#  $(LIBSECP256K1) \
+#  $(LIBCRYPTOPP)
 
-dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
+#dynamic_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
 
 # dynamicconsensus library #
@@ -509,6 +604,7 @@ clean-local:
 	-$(MAKE) -C leveldb clean
 	-$(MAKE) -C secp256k1 clean
 	-$(MAKE) -C univalue clean
+	-$(MAKE) -C cryptopp clean
 	-rm -f leveldb/*/*.gcda leveldb/*/*.gcno leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno
 	-rm -f config/dynamic-config.* config/stamp-h1
 

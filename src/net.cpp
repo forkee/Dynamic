@@ -27,6 +27,7 @@
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 #include "wallet/wallet.h"
+#include "protocol/ntp.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -93,6 +94,7 @@ CAddrMan addrman;
 int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 bool fAddressesInitialized = false;
 std::string strSubVersion;
+boost::array<int, 10> vnThreadsRunning;
 
 std::vector<CNode*> vNodes;
 CCriticalSection cs_vNodes;
@@ -1994,6 +1996,9 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
 
+    // Trusted NTP server, it's localhost by default.
+    strTrustedUpstream = GetArg("-ntp", "localhost");
+
     // Send and receive from sockets, accept connections
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));
 
@@ -2008,7 +2013,10 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
-
+    
+    // Start periodical NTP sampling thread
+    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "ntp", &ThreadNtpSamples));
+    
     // Dump network addresses
     scheduler.scheduleEvery(&DumpData, DUMP_ADDRESSES_INTERVAL);
 }

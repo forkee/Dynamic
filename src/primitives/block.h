@@ -29,7 +29,7 @@ public:
     uint32_t nTime;
     uint32_t nBits;
     uint32_t nNonce;
-
+    
     CBlockHeader()
     {
         SetNull();
@@ -62,21 +62,12 @@ public:
     {
         return (nBits == 0);
     }
-
-    uint256 GetHash() const
-    {
-        return hash_Argon2d(BEGIN(nVersion), END(nNonce), 1);
-    }
     
-    #ifdef __AVX2__
+    uint256 GetHash() const;
+#ifdef __AVX2__   
+    uint256 GetHashWithCtx(void *Matrix) const;
+#endif
     
-    uint256 GetHashWithCtx(void *Matrix) const
-    {
-		return(hash_Argon2d_ctx(UVOIDBEGIN(nVersion), Matrix, 1));
-	}
-	
-	#endif
-
     int64_t GetBlockTime() const
     {
         return (int64_t)nTime;
@@ -132,6 +123,7 @@ public:
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
+        
         return block;
     }
 

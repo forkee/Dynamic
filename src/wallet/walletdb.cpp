@@ -24,6 +24,7 @@
 using namespace boost;
 
 static uint64_t nAccountingEntryNumber = 0;
+extern int GetDynamicTxVersion();
 
 //
 // CWalletDB
@@ -374,11 +375,18 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             CWalletTx wtx;
             ssValue >> wtx;
             CValidationState state;
-            if (!(CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
-                return false;
 
+            if (!(CheckTransaction(wtx, state) && (wtx.GetHash() == hash) && state.IsValid()))
+			{
+				// SYSCOIN
+ 				if(wtx.GetHash() != hash && wtx.nVersion == GetDynamicTxVersion())
+ 					return true;
+ 				strErr = "Error reading wallet database. CheckTransaction failed, validation state: " + FormatStateMessage(state);
+                return false;
+			}
+			
             // Undo serialize changes in 31300
-            if (31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
+            /* if (31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
             {
                 if (!ssValue.empty())
                 {
@@ -395,7 +403,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
                     wtx.fTimeReceivedIsTxTime = 0;
                 }
                 wss.vWalletUpgrade.push_back(hash);
-            }
+            } */
 
             if (wtx.nOrderPos == -1)
                 wss.fAnyUnordered = true;

@@ -28,6 +28,7 @@
 #endif
 
 #include <boost/foreach.hpp>
+#include <boost/array.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2/signal.hpp>
 
@@ -76,6 +77,12 @@ static const bool DEFAULT_FORCEDNSSEED = false;
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
 
+// This seems like a bit too much adjusting
+enum threadId {
+	THREAD_NTP,
+	THREAD_MAX
+};
+
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;  // Default 24-hour ban
 
@@ -98,6 +105,7 @@ bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhite
 void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler);
 bool StopNode();
 void SocketSendData(CNode *pnode);
+extern boost::array<int, 10> vnThreadsRunning;
 
 typedef int NodeId;
 

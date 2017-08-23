@@ -38,6 +38,7 @@
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
 
 /**
@@ -1152,4 +1153,43 @@ UniValue estimatesmartpriority(const UniValue& params, bool fHelp)
     result.push_back(Pair("priority", priority));
     result.push_back(Pair("blocks", answerFound));
     return result;
+}
+
+double GetMoneySupply(bool fBurnt)
+{
+	double nSupply = 0;
+	
+    CBlockIndex* pindex = chainActive.Tip();
+    if (fBurnt) { nSupply = pindex->nDynamicBurnt; } 
+		   else { nSupply = pindex->nMoneySupply; }
+    
+    return nSupply / COIN;  
+}
+
+UniValue getmoneysupply(const UniValue& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+            "getmoneysupply \n"
+            "Returns the current total money in circulation and the total of coins burned");
+    
+    GetLastBlockIndex(chainActive.Tip());
+
+    UniValue obj(UniValue::VOBJ);
+    
+    // Q: Why are we even doing something this stupid?
+    // A: It's because UniValue converts these values in scientific notation
+    //	  and not all of us can read that, this is a cheap and easy solution,
+	//	  not necessarily the best
+	//
+	// TODO: Find a better way!
+	
+    try {
+		obj.push_back(Pair("moneysupply", boost::lexical_cast<std::string>(GetMoneySupply(false))));
+		obj.push_back(Pair("burntsupply", boost::lexical_cast<std::string>(GetMoneySupply(true))));
+	} catch (...) {
+		obj.push_back(Pair("error", "Boost Lexical Cast Failed! Contact developers!"));
+	}
+	
+    return obj;
 }

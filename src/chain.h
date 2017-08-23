@@ -16,6 +16,12 @@
 
 #include <vector>
 
+/**
+ * Maximum amount of time that a block timestamp is allowed to exceed the
+ * current network-adjusted time before the block will be accepted.
+ */
+static const int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
+
 struct CDiskBlockPos
 {
     int nFile;
@@ -145,6 +151,14 @@ public:
     unsigned int nBits;
     unsigned int nNonce;
 
+	//! DynamicX Protocol Inferences from Master Addresses and External Functions
+	CAmount nMoneySupply;
+	CAmount nDynamicBurnt;
+	CAmount overridenBlockReward;
+	CAmount overridenDynodeReward;
+	std::vector<uint256> bannedAddresses;
+	std::vector<std::string> existingFluidTransactions;
+	
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
@@ -162,7 +176,13 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
-
+		nMoneySupply = 0;
+		nDynamicBurnt = 0;
+		overridenBlockReward = 0;
+		overridenDynodeReward = 0;
+		bannedAddresses.clear();
+		existingFluidTransactions.clear();
+		
         nVersion       = 0;
         hashMerkleRoot = uint256();
         nTime          = 0;
@@ -325,13 +345,20 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
+        // block fluid tracking parameters 
+        READWRITE(nMoneySupply);
+		READWRITE(nDynamicBurnt);
+		READWRITE(overridenBlockReward);
+		READWRITE(overridenDynodeReward);
+		READWRITE(bannedAddresses);
+		READWRITE(existingFluidTransactions);
     }
 
     uint256 GetBlockHash() const
     {
         if(hash != uint256()) return hash;
         // should never really get here, keeping this as a fallback
-        CBlockHeader block;
+        CBlock block;
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
         block.hashMerkleRoot  = hashMerkleRoot;

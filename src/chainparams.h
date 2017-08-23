@@ -46,14 +46,26 @@ class CChainParams
 public:
     enum Base58Type {
         PUBKEY_ADDRESS,
+        PUBKEY_ADDRESS_DYN,
+        PUBKEY_ADDRESS_SEQ,
         SCRIPT_ADDRESS,
-        SECRET_KEY,     // BIP16
-        EXT_PUBLIC_KEY, // BIP32
-        EXT_SECRET_KEY, // BIP32
+        SCRIPT_ADDRESS_DYN,
+        SCRIPT_ADDRESS_SEQ,
+        SECRET_KEY,
+        SECRET_KEY_DYN,
+        SECRET_KEY_SEQ,
+        EXT_PUBLIC_KEY,
+        EXT_SECRET_KEY,
 
         MAX_BASE58_TYPES
+    };  
+    
+    enum AddressType {
+        ADDRESS_DYN,
+        ADDRESS_SEQ,
+        MAX_ADDRESS_TYPES
     };
-
+    
     const Consensus::Params& GetConsensus() const { return consensus; }
     const CMessageHeader::MessageStartChars& MessageStart() const { return pchMessageStart; }
     const std::vector<unsigned char>& AlertKey() const { return vAlertPubKey; }
@@ -83,6 +95,12 @@ public:
     int FulfilledRequestExpireTime() const { return nFulfilledRequestExpireTime; }
     std::string SporkPubKey() const { return strSporkPubKey; }
     std::string DynodePaymentPubKey() const { return strDynodePaymentsPubKey; }
+    /*
+    void injectGenesisBlock(CBlock block) {
+		fMiningRequiresPeers = false;
+		genesis = block;
+	}
+	*/
 protected:
     CChainParams() {}
 

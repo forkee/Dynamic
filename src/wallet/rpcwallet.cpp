@@ -6,6 +6,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "protocol/identity.h"
 #include "base58.h"
 #include "chain.h"
 #include "core_io.h"
@@ -30,6 +31,20 @@
 
 int64_t nWalletUnlockTime;
 static CCriticalSection cs_nWalletUnlockTime;
+
+using namespace std; // God, why?
+
+// DYNAMIC
+extern bool DecodeIdentityTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch, bool payment);
+extern bool DecodeOfferTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeCertTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeMessageTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool DecodeEscrowTx(const CTransaction& tx, int& op, int& nOut, vector<vector<unsigned char> >& vvch);
+extern bool CheckIdentityInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckOfferInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckCertInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckMessageInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
+extern bool CheckEscrowInputs(const CTransaction &tx, int op, int nOut, const vector<vector<unsigned char> > &vvchArgs, const CCoinsViewCache &inputs, bool fJustCheck, int nHeight, string &errorMessage, bool dontaddtodb);
 
 std::string HelpRequiringPassphrase()
 {
@@ -368,6 +383,124 @@ UniValue getaddressesbyaccount(const UniValue& params, bool fHelp)
             ret.push_back(address.ToString());
     }
     return ret;
+}
+
+// DYNAMIC: Send service transactions
+void SendMoneyDynamic(const vector<CRecipient> &vecSend, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, const CWalletTx* wtxIdentityIn=NULL, int nTxOutIdentity = 0, bool dynamicMultiSigTx=false, const CCoinControl* coinControl=NULL, const CWalletTx* wtxLinkIdentityIn=NULL, int nTxOutLinkIdentity = 0)
+{
+    CAmount curBalance = pwalletMain->GetBalance();
+
+    // Check amount
+    if (nValue <= 0)
+        throw runtime_error("Invalid amount");
+
+    if (nValue > curBalance)
+        throw runtime_error(strprintf("Insufficient funds. Amount requested %f, wallet balance %f", ValueFromAmount(nValue).get_real(), ValueFromAmount(curBalance).get_real()));
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwalletMain);
+    CAmount nFeeRequired;
+    std::string strError;
+    int nChangePosRet = -1;
+    
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError, coinControl, !dynamicMultiSigTx, ALL_COINS, false, wtxIdentityIn, nTxOutIdentity, true, wtxLinkIdentityIn, nTxOutLinkIdentity)) {
+        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw runtime_error(strError);
+    }
+	// run a check on the inputs without putting them into the db, just to ensure it will go into the mempool without issues and cause wallet annoyance
+	vector<vector<unsigned char> > vvch;
+	int op, nOut;
+	bool fJustCheck = true;
+	string errorMessage="";
+	CCoinsViewCache inputs(pcoinsTip);
+	for(unsigned int j = 0;j<wtxNew.vout.size();j++)
+	{
+		if(DecodeIdentityScript(wtxNew.vout[j].scriptPubKey, op, vvch))
+		{
+			CheckIdentityInputs(wtxNew, op, j, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+			if(!errorMessage.empty())
+				throw runtime_error(errorMessage.c_str());
+			CheckIdentityInputs(wtxNew,  op, j, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+			if(!errorMessage.empty())
+				throw runtime_error(errorMessage.c_str());
+		}
+	}
+	if(DecodeCertTx(wtxNew, op, nOut, vvch))
+	{
+		CheckCertInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckCertInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	if(DecodeEscrowTx(wtxNew, op, nOut, vvch))
+	{
+		CheckEscrowInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckEscrowInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	if(DecodeOfferTx(wtxNew, op, nOut, vvch))		
+	{
+		CheckOfferInputs(wtxNew,  op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckOfferInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+
+	}
+	if(DecodeMessageTx(wtxNew, op, nOut, vvch))
+	{
+		CheckMessageInputs(wtxNew, op, nOut, vvch, inputs, fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+		CheckMessageInputs(wtxNew,  op, nOut, vvch, inputs, !fJustCheck, chainActive.Tip()->nHeight+1, errorMessage, true);
+		if(!errorMessage.empty())
+			throw runtime_error(errorMessage.c_str());
+	}
+	
+    if (!dynamicMultiSigTx && !pwalletMain->CommitTransaction(wtxNew, reservekey))
+        throw runtime_error("DYNAMIC_RPC_ERROR ERRCODE: 9000 - " + _("The Dynamic identity you are trying to use for this transaction is invalid or has been updated and not confirmed yet! Please wait a block and try again..."));
+}
+
+void SendCustomTransaction(CScript generatedScript, CWalletTx& wtxNew, CAmount nValue = COIN)
+{
+    CAmount curBalance = pwalletMain->GetBalance();
+
+    // Check amount
+    if (nValue <= 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
+
+    if (nValue > curBalance)
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+
+    // Parse Dynamic address
+    CScript scriptPubKey = generatedScript;
+
+	LogPrintf("Script Public Key to be sent over to custom transaction processing: %s\n", ScriptToAsmStr(scriptPubKey));
+
+    // Create and send the transaction
+    CReserveKey reservekey(pwalletMain);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, false};
+    vecSend.push_back(recipient);
+    
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet,
+                                         strError, NULL, true, ALL_COINS, false)) {
+        if (nValue + nFeeRequired > pwalletMain->GetBalance())
+            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!", FormatMoney(nFeeRequired));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    if (!pwalletMain->CommitTransaction(wtxNew, reservekey, NetMsgType::TX))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if the timstamp of a Fluid transaction has expired or this might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
 }
 
 static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx& wtxNew, bool fUseInstantSend=false, bool fUsePrivateSend=false)

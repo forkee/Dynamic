@@ -29,7 +29,9 @@
 #include "consensus/validation.h"
 #include "validationinterface.h"
 #include "wallet/wallet.h"
+#include "protocol/fluid.h"
 
+#include <stdlib.h>
 #include <queue>
 #include <utility>
 
@@ -198,6 +200,10 @@ bool CheckWork(const CChainParams& chainparams, CBlock* pblock, CWallet& wallet,
     return true;
 }
 
+CScript AssimilateScriptFeeBurn(std::string feeString) {
+	return CScript() << OP_DESTROY << ParseHex(feeString.c_str());
+}
+
 std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn)
 {
     // Create new block
@@ -206,12 +212,12 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
         return nullptr;
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
 
-    // Create coinbase tx
+    // Create coinbase tx with fluid issuance
+    // TODO: Can this be made any more elegant?
     CMutableTransaction txNew;
     txNew.vin.resize(1);
     txNew.vin[0].prevout.SetNull();
     txNew.vout.resize(1);
-    txNew.vout[0].scriptPubKey = scriptPubKeyIn;
 
     // Largest block you're willing to create:
     unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
@@ -360,8 +366,8 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
             }
 
             CAmount nTxFees = iter->GetFee();
-            // Added
             pblock->vtx.push_back(tx);
+			
             pblocktemplate->vTxFees.push_back(nTxFees);
             pblocktemplate->vTxSigOps.push_back(nTxSigOps);
             nBlockSize += nTxSize;
@@ -400,12 +406,36 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
             }
         }
 
-
-        CAmount blockReward = GetPoWBlockPayment(nHeight, nFees);
+		CDynamicAddress address;
+		CValidationState validationState;
+		CAmount fluidIssuance;
+		bool areWeMinting = false;
+		CAmount blockReward = getBlockSubsidyWithOverride(nHeight, nFees, pindexPrev->overridenBlockReward);
 
         // Compute regular coinbase transaction.
-        txNew.vout[0].nValue = blockReward;
+        txNew.vout[0].scriptPubKey = scriptPubKeyIn;
+        // Compute fluid fee flushing
+
+        if (fluid.GetMintingInstructions(pindexPrev->GetBlockHeader(), validationState, address, fluidIssuance)) {
+			txNew.vout[0].nValue = blockReward + fluidIssuance - nFees;
+			LogPrintf("FluidMinting: Previous block contains minting instructions. Minting: %s, Address: %s\n", fluidIssuance, address.ToString());
+			areWeMinting = true;
+		} else {
+			txNew.vout[0].nValue = blockReward - nFees;
+			LogPrintf("FluidMinting: Previous block does not contain any minting instructions, continuing with block creation\n");
+		}
+		
         txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
+
+        if (areWeMinting) {
+            // Pick out the amount of issuance
+            txNew.vout[0].nValue -= fluidIssuance;
+			
+			assert(address.IsValid());	
+			CScript script = GetScriptForDestination(address.Get());
+
+            txNew.vout.push_back(CTxOut(fluidIssuance, script));
+		}
 
         // Update coinbase transaction with additional info about dynode and governance payments,
         // get some info back to pass to getblocktemplate
@@ -424,7 +454,7 @@ std::unique_ptr<CBlockTemplate> CreateNewBlock(const CChainParams& chainparams, 
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+		pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce         = 0;
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
@@ -463,38 +493,6 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 //
 double dHashesPerSec = 0.0;
 int64_t nHPSTimerStart = 0;
-
-// ScanHash scans nonces looking for a hash with at least some zero bits.
-// The nonce is usually preserved between calls, but periodically or if the
-// nonce is 0xffff0000 or above, the block is rebuilt and nNonce starts over at
-// zero.
-//
-//bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phash)
-//{
-    // Write the first 76 bytes of the block header to a double-SHA256 state.
-//    CHash256 hasher;
-//    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-//    ss << *pblock;
-//    assert(ss.size() == 80);
-//    hasher.Write((unsigned char*)&ss[0], 76);
-
-//    while (true) {
-//        nNonce++;
-
-        // Write the last 4 bytes of the block header (the nonce) to a copy of
-        // the double-SHA256 state, and compute the result.
-//        CHash256(hasher).Write((unsigned char*)&nNonce, 4).Finalize((unsigned char*)phash);
-
-        // Return the nonce if the hash has at least some zero bits,
-        // caller will check if it has enough to reach the target
-//        if (((uint16_t*)phash)[15] == 0)
-//            return true;
-
-        // If nothing found after trying for a while, return -1
-//        if ((nNonce & 0xfff) == 0)
-//            return false;
-//    }/
-//}
 
 static bool ProcessBlockFound(const CBlock* pblock, const CChainParams& chainparams)
 {

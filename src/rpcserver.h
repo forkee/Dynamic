@@ -181,7 +181,7 @@ extern UniValue getaddressutxos(const UniValue& params, bool fHelp);
 extern UniValue getaddressdeltas(const UniValue& params, bool fHelp);
 extern UniValue getaddresstxids(const UniValue& params, bool fHelp);
 extern UniValue getaddressbalance(const UniValue& params, bool fHelp);
-
+extern UniValue ntptime(const UniValue& params, bool fHelp);
 extern UniValue getpeerinfo(const UniValue& params, bool fHelp);
 extern UniValue ping(const UniValue& params, bool fHelp);
 extern UniValue addnode(const UniValue& params, bool fHelp);
@@ -200,16 +200,60 @@ extern UniValue dumpwallet(const UniValue& params, bool fHelp);
 extern UniValue dumphdinfo(const UniValue& params, bool fHelp);
 extern UniValue importwallet(const UniValue& params, bool fHelp);
 
-extern UniValue name_scan(const UniValue& params, bool fHelp); // for DDNS
-extern UniValue name_filter(const UniValue& params, bool fHelp);
-extern UniValue name_show(const UniValue& params, bool fHelp);
-extern UniValue name_history(const UniValue& params, bool fHelp);
-extern UniValue name_mempool(const UniValue& params, bool fHelp);
-extern UniValue name_new(const UniValue& params, bool fHelp);
-extern UniValue name_update(const UniValue& params, bool fHelp);
-extern UniValue name_delete(const UniValue& params, bool fHelp);
-extern UniValue name_list(const UniValue& params, bool fHelp);
-extern UniValue name_debug(const UniValue& params, bool fHelp);
+// START_DYNAMIC service rpc functions
+
+extern UniValue identitynew(const UniValue& params, bool fHelp);
+extern UniValue identityupdate(const UniValue& params, bool fHelp);
+extern UniValue identitylist(const UniValue& params, bool fHelp);
+extern UniValue identityaffiliates(const UniValue& params, bool fHelp);
+extern UniValue identityinfo(const UniValue& params, bool fHelp);
+extern UniValue identityhistory(const UniValue& params, bool fHelp);
+extern UniValue identityfilter(const UniValue& params, bool fHelp);
+extern UniValue identitypay(const UniValue& params, bool fHelp);
+extern UniValue generatepublickey(const UniValue& params, bool fHelp);
+
+
+extern UniValue offernew(const UniValue& params, bool fHelp);
+extern UniValue offerupdate(const UniValue& params, bool fHelp);
+extern UniValue offeraccept(const UniValue& params, bool fHelp);
+extern UniValue offerlink(const UniValue& params, bool fHelp);
+extern UniValue offeraddwhitelist(const UniValue& params, bool fHelp);
+extern UniValue offerremovewhitelist(const UniValue& params, bool fHelp);
+extern UniValue offerclearwhitelist(const UniValue& params, bool fHelp);
+extern UniValue offerwhitelist(const UniValue& params, bool fHelp);
+extern UniValue offerinfo(const UniValue& params, bool fHelp);
+extern UniValue offerlist(const UniValue& params, bool fHelp);
+extern UniValue offeracceptlist(const UniValue& params, bool fHelp);
+extern UniValue offerhistory(const UniValue& params, bool fHelp);
+extern UniValue offerfilter(const UniValue& params, bool fHelp);
+
+
+extern UniValue certupdate(const UniValue& params, bool fHelp);
+extern UniValue certnew(const UniValue& params, bool fHelp);
+extern UniValue certtransfer(const UniValue& params, bool fHelp);
+extern UniValue certinfo(const UniValue& params, bool fHelp);
+extern UniValue certlist(const UniValue& params, bool fHelp);
+extern UniValue certhistory(const UniValue& params, bool fHelp);
+extern UniValue certfilter(const UniValue& params, bool fHelp);
+
+extern UniValue escrownew(const UniValue& params, bool fHelp);
+extern UniValue escrowrelease(const UniValue& params, bool fHelp);
+// extern UniValue escrowcomplete(const UniValue& params, bool fHelp);
+extern UniValue escrowclaimrelease(const UniValue& params, bool fHelp);
+extern UniValue escrowrefund(const UniValue& params, bool fHelp);
+extern UniValue escrowclaimrefund(const UniValue& params, bool fHelp);
+extern UniValue escrowinfo(const UniValue& params, bool fHelp);
+extern UniValue escrowlist(const UniValue& params, bool fHelp);
+extern UniValue escrowhistory(const UniValue& params, bool fHelp);
+extern UniValue escrowfilter(const UniValue& params, bool fHelp);
+
+extern UniValue messagenew(const UniValue& params, bool fHelp);
+extern UniValue messageinfo(const UniValue& params, bool fHelp);
+// extern UniValue messagelist(const UniValue& params, bool fHelp);
+extern UniValue messagesentlist(const UniValue& params, bool fHelp);
+// extern UniValue messagehistory(const UniValue& params, bool fHelp);
+
+// END_DYNAMIC service rpc functions
 
 extern UniValue getgenerate(const UniValue& params, bool fHelp); // in rpcmining.cpp
 extern UniValue setgenerate(const UniValue& params, bool fHelp);
@@ -219,6 +263,7 @@ extern UniValue getnetworkhashps(const UniValue& params, bool fHelp);
 extern UniValue gethashespersec(const UniValue& params, bool fHelp);
 extern UniValue getmininginfo(const UniValue& params, bool fHelp);
 extern UniValue getpowrewardstart(const UniValue& params, bool fHelp);
+extern UniValue getmoneysupply(const UniValue& params, bool fHelp);
 extern UniValue prioritisetransaction(const UniValue& params, bool fHelp);
 extern UniValue getblocktemplate(const UniValue& params, bool fHelp);
 extern UniValue submitblock(const UniValue& params, bool fHelp);
@@ -315,6 +360,14 @@ extern UniValue getchaintips(const UniValue& params, bool fHelp);
 extern UniValue invalidateblock(const UniValue& params, bool fHelp);
 extern UniValue reconsiderblock(const UniValue& params, bool fHelp);
 extern UniValue getspentinfo(const UniValue& params, bool fHelp);
+
+extern UniValue sendfluidtransaction(const UniValue& params, bool fHelp); // in protocol/fluid.cpp
+extern UniValue burndynamic(const UniValue& params, bool fHelp);
+extern UniValue signtoken(const UniValue& params, bool fHelp);
+extern UniValue consenttoken(const UniValue& params, bool fHelp);
+extern UniValue getrawpubkey(const UniValue& params, bool fHelp);
+extern UniValue verifyquorum(const UniValue& params, bool fHelp);
+extern UniValue stringtohex(const UniValue& params, bool fHelp);
 
 bool StartRPC();
 void InterruptRPC();

@@ -127,7 +127,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_CHECKMULTISIG          : return "OP_CHECKMULTISIG";
     case OP_CHECKMULTISIGVERIFY    : return "OP_CHECKMULTISIGVERIFY";
 
-    // expanson
+    // expansion
     case OP_NOP1                   : return "OP_NOP1";
     case OP_CHECKLOCKTIMEVERIFY    : return "OP_CHECKLOCKTIMEVERIFY";
     case OP_CHECKSEQUENCEVERIFY    : return "OP_CHECKSEQUENCEVERIFY";
@@ -138,6 +138,17 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP8                   : return "OP_NOP8";
     case OP_NOP9                   : return "OP_NOP9";
     case OP_NOP10                  : return "OP_NOP10";
+
+	// Fluid Autonomus Monetary Management System (FAM2S)
+	case OP_MINT				   : return "OP_MINT";
+	case OP_DESTROY				   : return "OP_DESTROY";
+	case OP_DROPLET				   : return "OP_DROPLET";
+	case OP_REWARD_DYNODE		   : return "OP_REWARD_DYNODE";
+	case OP_REWARD_MINING		   : return "OP_REWARD_MINING";
+	case OP_STERILIZE			   : return "OP_STERILIZE";
+	case OP_REALLOW				   : return "OP_REALLOW";
+	case OP_FLUID_DEACTIVATE	   : return "OP_FLUID_DEACTIVATE";
+	case OP_FLUID_REACTIVATE	   : return "OP_FLUID_REACTIVATE";
 
     case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
 
